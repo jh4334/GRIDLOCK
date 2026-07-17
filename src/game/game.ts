@@ -22,11 +22,10 @@ import { BuildMenu } from '../ui/buildMenu';
 import { Controls } from '../ui/controls';
 import { renderOverlay } from '../ui/overlay';
 import { WaveManager } from './waves';
-import type { GameState } from './state';
 import { DebugCheats, renderHitboxes } from '../debug/cheats';
 import { Interaction } from './interaction';
 import { renderTitle } from '../ui/title';
-import { loadBest, updateBest, type BestRecord } from '../core/storage';
+import { GameFlow } from './flow';
 
 // 배속 옵션(구조 상수 — 서브스텝 반복 횟수). 밸런스 수치 아님.
 const SPEEDS = [1, 2, 3];
@@ -50,17 +49,16 @@ export class Game {
   private readonly controls: Controls;
   private readonly waveManager: WaveManager;
   private readonly interaction: Interaction;
+  private readonly flow: GameFlow; // menu/playing/won/lost 상태머신 + 최고기록 소유.
 
   private flowField: FlowField;
   private enemies: Enemy[] = [];
 
-  private state: GameState = 'menu'; // 부팅 즉시 타이틀 화면(M9).
   private speed = 1; // 배속(서브스텝 반복 횟수). update가 게임 월드를 이 횟수만큼 갱신.
 
   private showFlowDebug = false;
   private showHitbox = false; // H 치트로 토글하는 히트박스 오버레이.
   private lastGold: number; // 골드 변동 감지용(변할 때만 메뉴 갱신).
-  private best: BestRecord | null = loadBest(); // localStorage 최고기록(타이틀·승패 화면 표시).
 
   constructor(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D) {
     this.canvas = canvas;
@@ -98,9 +96,8 @@ export class Game {
         this.audio.waveClear();
       },
       onVictory: () => {
-        this.state = 'won';
+        this.flow.win();
         this.audio.win();
-        this.recordResult(true);
       },
     });
 
@@ -108,8 +105,8 @@ export class Game {
       speeds: SPEEDS,
       onNextWave: () => this.startNextWave(),
       onSetSpeed: (s) => this.setSpeed(s),
-      onRestart: () => this.restart(),
-      onToTitle: () => this.toMenu(),
+      onRestart: () => this.flow.restart(),
+      onToTitle: () => this.flow.toMenu(),
     });
     this.controls.setActiveSpeed(this.speed);
 
@@ -142,9 +139,31 @@ export class Game {
       recomputeField: () => this.recomputeField(),
     });
 
+    // 상태머신 — 서브시스템 참조 + Game 소유 필드(enemies/speed/hitbox/lastGold) 리셋 콜백 주입.
+    this.flow = new GameFlow({
+      economy: this.economy,
+      grid: this.grid,
+      interaction: this.interaction,
+      combat: this.combat,
+      effects: this.effects,
+      waveManager: this.waveManager,
+      shake: this.shake,
+      buildMenu: this.buildMenu,
+      controls: this.controls,
+      clearEnemies: () => {
+        this.enemies = [];
+      },
+      recomputeField: () => this.recomputeField(),
+      setSpeed: (s) => this.setSpeed(s),
+      resetView: () => {
+        this.showHitbox = false;
+        this.lastGold = this.economy.gold;
+      },
+    });
+
     // 캔버스 클릭 — menu에선 게임 시작, 그 외엔 설치/선택 상호작용.
     this.input.onClick((x, y) => {
-      if (this.state === 'menu') this.startGame();
+      if (this.flow.state === 'menu') this.flow.startGame();
       else this.interaction.handleClick(x, y);
     });
     this.keyboard.on('d', () => {
@@ -154,11 +173,8 @@ export class Game {
     this.keyboard.on('u', () => this.interaction.upgradeSelected()); // 선택 타워 업그레이드.
     this.keyboard.on('x', () => this.interaction.sellSelected());
     this.keyboard.on('m', () => this.audio.toggleMute()); // 음소거 토글.
-    this.keyboard.on('r', () => this.restart()); // 승리/패배 후 다시 시작.
-    this.keyboard.on(' ', () => this.startGame()); // Space — 타이틀에서 시작.
-
-    // 부팅 시 menu 상태 — 게임 월드 UI(빌드 메뉴·컨트롤 바)는 숨긴 채 시작.
-    this.setGameplayUiVisible(false);
+    this.keyboard.on('r', () => this.flow.restart()); // 승리/패배 후 다시 시작.
+    this.keyboard.on(' ', () => this.flow.startGame()); // Space — 타이틀에서 시작.
   }
 
   start(): void {
@@ -171,15 +187,15 @@ export class Game {
     for (const e of this.enemies) e.reroute(this.flowField);
   }
 
-  // ── 웨이브 / 배속 / 재시작 ──────────────────────────────────────
+  // ── 웨이브 / 배속 ──────────────────────────────────────────────
   private startNextWave(): void {
-    if (this.state !== 'playing') return;
+    if (this.flow.state !== 'playing') return;
     this.waveManager.startNextWave();
   }
 
   // N 치트 — 필드의 적을 보상 없이 제거하고 현재 웨이브를 즉시 완료 처리.
   private skipWave(): void {
-    if (this.state !== 'playing') return;
+    if (this.flow.state !== 'playing') return;
     this.enemies = [];
     this.waveManager.skip();
   }
@@ -187,67 +203,6 @@ export class Game {
   private setSpeed(s: number): void {
     this.speed = s;
     this.controls.setActiveSpeed(s);
-  }
-
-  // 게임 월드 초기화 — 페이지 리로드 없이 상태만 시작값으로 되돌린다(리스너·DOM 재생성 없음).
-  // 상태(state) 전환은 호출부(restart/toMenu/startGame)가 담당한다.
-  private resetWorld(): void {
-    this.economy.reset();
-    this.enemies = [];
-    this.interaction.reset();
-    this.grid.resetCells();
-    this.combat.reset();
-    this.effects.reset();
-    this.waveManager.reset();
-    this.recomputeField();
-
-    this.setSpeed(1);
-    this.showHitbox = false;
-    this.shake.reset();
-
-    this.lastGold = this.economy.gold;
-    this.buildMenu.updateAffordability(this.economy.gold);
-  }
-
-  // 다시 시작 — 승리/패배 상태에서 즉시 재플레이.
-  private restart(): void {
-    if (this.state !== 'won' && this.state !== 'lost') return;
-    this.resetWorld();
-    this.state = 'playing';
-    this.controls.showRestart(false);
-  }
-
-  // 타이틀로 — 승리/패배 상태에서 타이틀 화면으로 복귀(월드 초기화 + 게임 UI 숨김).
-  private toMenu(): void {
-    if (this.state === 'menu') return;
-    this.resetWorld();
-    this.state = 'menu';
-    this.controls.showRestart(false);
-    this.setGameplayUiVisible(false);
-  }
-
-  // 시작 — 타이틀에서 클릭/Space로 게임 시작(월드 초기화 + 게임 UI 노출).
-  private startGame(): void {
-    if (this.state !== 'menu') return;
-    this.resetWorld();
-    this.state = 'playing';
-    this.setGameplayUiVisible(true);
-  }
-
-  // menu 상태에선 빌드 메뉴·컨트롤 바를 숨기고, 게임 중에는 노출한다.
-  private setGameplayUiVisible(show: boolean): void {
-    this.controls.setBarVisible(show);
-    this.buildMenu.setVisible(show);
-  }
-
-  // 승/패 확정 시 최고기록 갱신. 승리는 총 웨이브 클리어, 패배는 도달 웨이브 기준.
-  private recordResult(cleared: boolean): void {
-    const candidate: BestRecord = {
-      wave: cleared ? this.waveManager.total : this.waveManager.current,
-      lives: this.economy.lives,
-      cleared,
-    };
-    this.best = updateBest(candidate);
   }
 
   // ── update / render ─────────────────────────────────────────
@@ -261,7 +216,7 @@ export class Game {
     this.shake.update(dt); // 화면흔들림은 실시간 기준 1회/프레임.
 
     // 게임 월드는 playing 상태에서만, 배속 수만큼 서브스텝으로 갱신.
-    if (this.state === 'playing') {
+    if (this.flow.state === 'playing') {
       for (let i = 0; i < this.speed; i++) this.updateWorld(dt);
     }
 
@@ -270,7 +225,7 @@ export class Game {
 
   // 게임 월드 1스텝(적·전투·라이프·필터·웨이브·승패). 배속 시 이 함수만 반복된다.
   private updateWorld(dt: number): void {
-    if (this.state !== 'playing') return; // 서브스텝 중 승/패 전환 시 잔여 스텝 중단.
+    if (this.flow.state !== 'playing') return; // 서브스텝 중 승/패 전환 시 잔여 스텝 중단.
     this.spawner.update(dt);
 
     for (const e of this.enemies) e.update(dt, this.flowField);
@@ -286,9 +241,8 @@ export class Game {
     this.waveManager.update(dt, () => this.enemies.length);
 
     if (this.economy.isDefeated) {
-      this.state = 'lost';
+      this.flow.lose();
       this.audio.lose();
-      this.recordResult(false);
     }
   }
 
@@ -300,8 +254,9 @@ export class Game {
       this.interaction.refreshPanel(); // 골드 변동 → 업그레이드 버튼 활성 여부 갱신.
     }
     // 다음 웨이브 버튼은 진행 중 + 대기 상태 + 남은 웨이브가 있을 때만 활성.
-    this.controls.setNextWaveEnabled(this.state === 'playing' && this.waveManager.canStart);
-    this.controls.showRestart(this.state !== 'playing');
+    const state = this.flow.state;
+    this.controls.setNextWaveEnabled(state === 'playing' && this.waveManager.canStart);
+    this.controls.showRestart(state === 'won' || state === 'lost'); // menu는 바 자체가 숨김.
   }
 
   private render(): void {
@@ -309,8 +264,8 @@ export class Game {
     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
     // menu — 게임 월드 대신 타이틀 화면만 그린다.
-    if (this.state === 'menu') {
-      renderTitle(ctx, this.best);
+    if (this.flow.state === 'menu') {
+      renderTitle(ctx, this.flow.best);
       return;
     }
 
@@ -337,7 +292,7 @@ export class Game {
       total: this.waveManager.total,
     });
     // 승리/패배 오버레이는 HUD 위, FPS 아래로 그린다.
-    renderOverlay(ctx, this.state, this.waveManager.current, this.waveManager.total, this.best);
+    renderOverlay(ctx, this.flow.state, this.waveManager.current, this.waveManager.total, this.flow.best);
     this.fps.render(ctx);
 
     ctx.restore();
