@@ -103,3 +103,31 @@ export function saveAudio(settings: AudioSettings): void {
     // 저장 실패는 게임 진행에 영향 없음 — 무시.
   }
 }
+
+// ── 정복 AI 난이도(D3.3) ──────────────────────────────────────────
+// 타이틀에서 고른 정복 난이도(쉬움/보통/어려움)를 gridlock.difficulty에 저장·복원한다.
+// 값이 없거나 손상/예외면 기본값 'normal'(보통) — 현행 밸런스.
+
+export type DifficultyId = 'easy' | 'normal' | 'hard';
+
+const DIFFICULTY_KEY = 'gridlock.difficulty';
+
+/** 저장된 정복 난이도를 읽는다. 없거나 손상/예외면 'normal'. */
+export function loadDifficulty(): DifficultyId {
+  try {
+    const raw = localStorage.getItem(DIFFICULTY_KEY);
+    if (raw === 'easy' || raw === 'normal' || raw === 'hard') return raw;
+  } catch {
+    // 접근 예외는 무시하고 기본값으로.
+  }
+  return 'normal';
+}
+
+/** 정복 난이도 저장. 예외(프라이빗 모드 등)는 조용히 무시. */
+export function saveDifficulty(id: DifficultyId): void {
+  try {
+    localStorage.setItem(DIFFICULTY_KEY, id);
+  } catch {
+    // 저장 실패는 게임 진행에 영향 없음 — 무시.
+  }
+}

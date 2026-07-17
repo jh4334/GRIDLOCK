@@ -2,14 +2,8 @@
   "startCrystal": 150,
   "hq": {
     "hp": 900,
-    "playerCell": [
-      2,
-      11
-    ],
-    "enemyCell": [
-      17,
-      2
-    ],
+    "playerCell": [2, 11],
+    "enemyCell": [17, 2],
     "workerCost": 50,
     "workerBuildTime": 4,
     "queueMax": 5
@@ -33,52 +27,9 @@
       "home": 300,
       "center": 800
     },
-    "playerCells": [
-      [
-        4,
-        9
-      ],
-      [
-        5,
-        9
-      ],
-      [
-        4,
-        10
-      ],
-      [
-        5,
-        10
-      ]
-    ],
-    "enemyCells": [
-      [
-        14,
-        3
-      ],
-      [
-        15,
-        3
-      ],
-      [
-        14,
-        4
-      ],
-      [
-        15,
-        4
-      ]
-    ],
-    "centerCells": [
-      [
-        9,
-        6
-      ],
-      [
-        10,
-        7
-      ]
-    ]
+    "playerCells": [[4, 9], [5, 9], [4, 10], [5, 10]],
+    "enemyCells": [[14, 3], [15, 3], [14, 4], [15, 4]],
+    "centerCells": [[9, 6], [10, 7]]
   },
   "unit": {
     "hp": 55,
@@ -143,48 +94,30 @@
     }
   },
   "enemy": {
-    "startCrystal": 150,
     "workerCount": 2,
-    "attackInterval": 120,
     "waveDuration": 35,
-    "buildOrder": [
-      "worker",
-      "worker",
-      "depot",
-      "barracks",
-      "barracks",
-      "factory",
-      "turret"
-    ],
     "layout": {
-      "depot": [
-        [
-          18,
-          2
-        ]
-      ],
-      "barracks": [
-        [
-          18,
-          3
-        ],
-        [
-          18,
-          4
-        ]
-      ],
-      "factory": [
-        [
-          16,
-          4
-        ]
-      ],
-      "turret": [
-        [
-          16,
-          5
-        ]
-      ]
+      "depot": [[18, 2]],
+      "barracks": [[18, 3], [18, 4], [18, 5]],
+      "factory": [[16, 4]],
+      "turret": [[16, 5]]
+    }
+  },
+  "difficulty": {
+    "easy": {
+      "attackInterval": 160,
+      "startCrystal": 100,
+      "buildOrder": ["worker", "worker", "depot", "barracks", "barracks"]
+    },
+    "normal": {
+      "attackInterval": 120,
+      "startCrystal": 150,
+      "buildOrder": ["worker", "worker", "depot", "barracks", "barracks", "factory", "turret"]
+    },
+    "hard": {
+      "attackInterval": 95,
+      "startCrystal": 220,
+      "buildOrder": ["worker", "worker", "depot", "barracks", "barracks", "factory", "turret", "barracks"]
     }
   }
 }

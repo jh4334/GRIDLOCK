@@ -4,18 +4,19 @@
 // update(dt)에서만 상태 변경. 승패 확정(phase) 후에는 시뮬레이션을 정지한다.
 
 import conquestData from '../data/conquest.json';
-import { cellCenter, pixelToCell } from '../game/grid';
-import { findPath } from '../systems/astar';
+import { cellCenter } from '../game/grid';
 import { EffectsSystem } from '../systems/effects';
 import { ConquestGrid, walkableNeighbors } from './conquestMap';
 import { Crystal } from './crystal';
 import { HQ } from './hq';
 import { Building, BuildKind } from './building';
 import { Worker, WorkerContext } from './worker';
-import { CombatUnit, Combatant } from './combatUnit';
+import { CombatUnit } from './combatUnit';
 import { spawnUnitsFor, maintainRoster } from './roster';
-import { ConquestCombat, pathToStructure } from './conquestCombat';
-import { EnemyAI } from './enemyAI';
+import { ConquestCombat } from './conquestCombat';
+import { commandUnits as runCommandUnits, commandWorkers as runCommandWorkers } from './conquestCommands';
+import { EnemyAI, type DifficultySettings } from './enemyAI';
+import type { DifficultyId } from '../core/storage';
 
 const C = conquestData;
 
@@ -46,7 +47,8 @@ export class ConquestWorld {
   phase: ConquestPhase = 'playing';
   private depotsBuilt = 0;
 
-  constructor(private audio?: WorldAudio) {
+  // difficulty(D3.3): 적 진영에만 적용(공격 주기·빌드오더·시작 자원). 플레이어 시작 자원은 공통 150.
+  constructor(private audio?: WorldAudio, difficulty: DifficultyId = 'normal') {
     this.playerHQ = new HQ('player', C.hq.playerCell[0], C.hq.playerCell[1], C.hq.hp, C.hq.workerBuildTime, C.hq.queueMax);
     this.enemyHQ = new HQ('enemy', C.hq.enemyCell[0], C.hq.enemyCell[1], C.hq.hp, C.hq.workerBuildTime, C.hq.queueMax);
     this.grid.setState(this.playerHQ.cx, this.playerHQ.cy, 'wall');
@@ -66,6 +68,13 @@ export class ConquestWorld {
       onProjectileHit: () => this.audio?.hit(),
     });
 
+    const diffCfg = C.difficulty[difficulty];
+    const diff: DifficultySettings = {
+      attackInterval: diffCfg.attackInterval,
+      startCrystal: diffCfg.startCrystal,
+      buildOrder: diffCfg.buildOrder as (BuildKind | 'worker')[],
+    };
+
     this.enemyAI = new EnemyAI({
       grid: this.grid,
       crystals: this.crystals,
@@ -73,6 +82,7 @@ export class ConquestWorld {
       playerHQ: this.playerHQ,
       buildings: this.buildings,
       units: this.units,
+      difficulty: diff,
       onBuildComplete: (b) => this.onBuildComplete(b),
       onWaveLaunch: () => this.audio?.alarm(), // 적 웨이브 출발 시 경보음.
     });
@@ -191,69 +201,15 @@ export class ConquestWorld {
     };
   }
 
-  // ── 플레이어 유닛 명령(우클릭) ───────────────────────────────
-  /** 선택 유닛에게 이동/공격 명령 — 클릭 지점이 적 구조물/유닛 근처면 접근 후 공격.
-   *  attackMove=true(A키)면 경로 이동 중에도 전체 사거리로 적 유닛·건물을 감지·교전한다. */
+  // ── 플레이어 명령(우클릭) — 변환 로직은 conquestCommands로 위임(공개 필드만 읽음) ──────
+  /** 선택 유닛에게 이동/공격 명령(A키 attackMove 지원). */
   commandUnits(units: CombatUnit[], px: number, py: number, attackMove = false): void {
-    const { cx, cy } = pixelToCell(px, py);
-    const target = this.hostileTargetAt(px, py, 'player');
-    for (const u of units) {
-      u.attackMove = attackMove;
-      if (target && target.structure) {
-        const tcell = this.structureCell(target);
-        const path = pathToStructure(this.grid, u.cell, tcell.cx, tcell.cy);
-        if (path) {
-          u.path = path;
-          u.orderedTarget = target;
-        }
-      } else if (target) {
-        const p = findPath(this.grid, u.cell, pixelToCell(target.x, target.y));
-        if (p) u.path = p.map((c) => cellCenter(c.cx, c.cy));
-        u.orderedTarget = target;
-      } else if (this.grid.isWalkable(cx, cy)) {
-        const p = findPath(this.grid, u.cell, { cx, cy });
-        if (p) {
-          u.path = p.map((c) => cellCenter(c.cx, c.cy));
-          u.orderedTarget = null;
-          u.setGuard(cellCenter(cx, cy).x, cellCenter(cx, cy).y);
-        }
-      }
-    }
+    runCommandUnits(this, units, px, py, attackMove);
   }
 
-  /** 선택 일꾼 명령 — 클릭 칸이 크리스탈이면 채집, 통행 칸이면 이동. */
+  /** 선택 일꾼 명령 — 크리스탈이면 채집, 통행 칸이면 이동. */
   commandWorkers(workers: Worker[], px: number, py: number): void {
-    const { cx, cy } = pixelToCell(px, py);
-    const crystal = this.crystals.find((c) => c.cx === cx && c.cy === cy && !c.depleted);
-    for (const w of workers) {
-      if (crystal) w.commandHarvest(crystal, this.grid);
-      else if (this.grid.isWalkable(cx, cy)) w.commandMove(cx, cy, this.grid);
-    }
-  }
-
-  // 클릭 지점 근처의 적(반대 진영) 구조물/유닛. 없으면 null.
-  private hostileTargetAt(px: number, py: number, side: 'player' | 'enemy'): Combatant | null {
-    const { cx, cy } = pixelToCell(px, py);
-    const foeHQ = side === 'player' ? this.enemyHQ : this.playerHQ;
-    if (foeHQ.occupies(cx, cy) && !foeHQ.dead) return foeHQ;
-    for (const b of this.buildings) {
-      if (b.side !== side && b.complete && !b.destroyed && b.cx === cx && b.cy === cy) return b;
-    }
-    let best: CombatUnit | null = null;
-    let bestD = C.unit.radius * C.unit.radius * 4;
-    for (const u of this.units) {
-      if (u.dead || u.side === side) continue;
-      const d = (u.x - px) ** 2 + (u.y - py) ** 2;
-      if (d <= bestD) {
-        bestD = d;
-        best = u;
-      }
-    }
-    return best;
-  }
-
-  private structureCell(c: Combatant): { cx: number; cy: number } {
-    return pixelToCell(c.x, c.y);
+    runCommandWorkers(this, workers, px, py);
   }
 
   // ── update(1 서브스텝) ───────────────────────────────────────

@@ -2,12 +2,13 @@
 // 상태 변경 없는 순수 렌더. 버튼 클릭 판정(hitTitleButton)은 App이 받아 모드를 전환한다.
 // 최고기록 문자열 포맷(formatBest)은 승/패 오버레이와 공유한다.
 
-import type { BestRecord } from '../core/storage';
+import type { BestRecord, DifficultyId } from '../core/storage';
 import { animTime } from '../render/sprites';
 
 const COLOR_LOGO = '#e6d38f'; // STEEL GRID — 초원 전장 톤(앰버/올리브).
 const COLOR_SUB = '#a8b48a';
 const COLOR_BEST = '#e0b357';
+const COLOR_NEON_CONQUEST = '#ff4d6a';
 
 export type TitleMode = 'defense' | 'conquest';
 
@@ -21,6 +22,16 @@ interface Rect {
 const BTN_W = 240;
 const BTN_H = 64;
 const BTN_GAP = 40;
+
+// 정복 난이도 선택(D3.3) — 정복 버튼 바로 아래 3개 소형 버튼. 순서·라벨은 여기서 소유.
+const DIFF_ORDER: { id: DifficultyId; label: string }[] = [
+  { id: 'easy', label: '쉬움' },
+  { id: 'normal', label: '보통' },
+  { id: 'hard', label: '어려움' },
+];
+const DBTN_W = 74;
+const DBTN_H = 34;
+const DBTN_GAP = 6;
 
 // 두 모드 버튼의 사각형(렌더·클릭 판정 공유). 캔버스 크기에 맞춰 가운데 정렬.
 export function titleButtons(w: number, h: number): { defense: Rect; conquest: Rect } {
@@ -45,6 +56,24 @@ function inside(r: Rect, px: number, py: number): boolean {
   return px >= r.x && px <= r.x + r.w && py >= r.y && py <= r.y + r.h;
 }
 
+// 난이도 버튼 3개 사각형(렌더·클릭 판정 공유). 정복 버튼 중앙 아래에 가로로 정렬.
+export function difficultyButtons(w: number, h: number): { id: DifficultyId; rect: Rect }[] {
+  const conquest = titleButtons(w, h).conquest;
+  const totalW = DBTN_W * 3 + DBTN_GAP * 2;
+  const startX = conquest.x + conquest.w / 2 - totalW / 2;
+  const y = conquest.y + conquest.h + 22;
+  return DIFF_ORDER.map((d, i) => ({
+    id: d.id,
+    rect: { x: startX + i * (DBTN_W + DBTN_GAP), y, w: DBTN_W, h: DBTN_H },
+  }));
+}
+
+/** 클릭 좌표가 어느 난이도 버튼 위인지. 아니면 null. */
+export function hitDifficultyButton(w: number, h: number, px: number, py: number): DifficultyId | null {
+  for (const d of difficultyButtons(w, h)) if (inside(d.rect, px, py)) return d.id;
+  return null;
+}
+
 /** 최고기록 한 줄 문자열. 없으면 안내 문구. (승/패 오버레이와 공유) */
 export function formatBest(best: BestRecord | null): string {
   if (!best) return '최고 기록: 없음';
@@ -52,7 +81,7 @@ export function formatBest(best: BestRecord | null): string {
   return `최고 기록: ${wavePart} (라이프 ${best.lives})`;
 }
 
-export function renderTitle(ctx: CanvasRenderingContext2D, best: BestRecord | null): void {
+export function renderTitle(ctx: CanvasRenderingContext2D, best: BestRecord | null, difficulty: DifficultyId): void {
   const w = ctx.canvas.width;
   const h = ctx.canvas.height;
 
@@ -81,7 +110,10 @@ export function renderTitle(ctx: CanvasRenderingContext2D, best: BestRecord | nu
   // 모드 버튼(네온)
   const b = titleButtons(w, h);
   drawButton(ctx, b.defense, '디펜스 모드', '#39d5ff', '20웨이브 생존');
-  drawButton(ctx, b.conquest, '정복 모드', '#ff4d6a', '본진 정복 RTS');
+  drawButton(ctx, b.conquest, '정복 모드', COLOR_NEON_CONQUEST, '본진 정복 RTS');
+
+  // 정복 난이도 선택(현재 선택 하이라이트).
+  drawDifficultyButtons(ctx, w, h, difficulty);
 
   // 최고기록(디펜스 기준)
   ctx.textAlign = 'center';
@@ -117,6 +149,43 @@ function paintBackdrop(ctx: CanvasRenderingContext2D, w: number, h: number): voi
   // 스캔라인(가로 옅은 줄).
   ctx.fillStyle = 'rgba(0, 0, 0, 0.12)';
   for (let y = 0; y < h; y += 3) ctx.fillRect(0, y, w, 1);
+}
+
+// 난이도 3버튼 — 현재 선택은 정복 네온(붉은색)으로 강조, 나머지는 어둡게. 캔버스 렌더.
+function drawDifficultyButtons(ctx: CanvasRenderingContext2D, w: number, h: number, current: DifficultyId): void {
+  const btns = difficultyButtons(w, h);
+  const first = btns[0].rect;
+
+  // 안내 라벨("난이도") — 버튼 줄 위.
+  ctx.save();
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.font = '13px system-ui, sans-serif';
+  ctx.fillStyle = 'rgba(200, 220, 255, 0.55)';
+  ctx.fillText('난이도', first.x, first.y - 12);
+  ctx.restore();
+
+  for (let i = 0; i < btns.length; i++) {
+    const { rect } = btns[i];
+    const selected = btns[i].id === current;
+    ctx.save();
+    ctx.fillStyle = selected ? 'rgba(60, 26, 34, 0.9)' : 'rgba(20, 28, 44, 0.85)';
+    ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+    ctx.strokeStyle = selected ? COLOR_NEON_CONQUEST : 'rgba(120, 170, 230, 0.35)';
+    if (selected) {
+      ctx.shadowColor = COLOR_NEON_CONQUEST;
+      ctx.shadowBlur = 10;
+    }
+    ctx.lineWidth = selected ? 2 : 1;
+    ctx.strokeRect(rect.x + 1, rect.y + 1, rect.w - 2, rect.h - 2);
+    ctx.restore();
+
+    ctx.fillStyle = selected ? '#ffd7de' : 'rgba(200, 220, 255, 0.6)';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = `${selected ? 'bold ' : ''}15px system-ui, sans-serif`;
+    ctx.fillText(DIFF_ORDER[i].label, rect.x + rect.w / 2, rect.y + rect.h / 2);
+  }
 }
 
 function drawButton(ctx: CanvasRenderingContext2D, r: Rect, label: string, neon: string, sub: string): void {

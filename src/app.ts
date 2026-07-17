@@ -8,10 +8,10 @@
 import { GameLoop } from './core/loop';
 import { MouseInput } from './core/input';
 import { AudioEngine } from './core/audio';
-import { loadAudio, saveAudio } from './core/storage';
+import { loadAudio, saveAudio, loadDifficulty, saveDifficulty, type DifficultyId } from './core/storage';
 import { Game } from './game/game';
 import { ConquestGame } from './conquest/conquestGame';
-import { renderTitle, hitTitleButton } from './ui/title';
+import { renderTitle, hitTitleButton, hitDifficultyButton } from './ui/title';
 import { tickClock } from './render/sprites';
 
 type Mode = 'title' | 'defense' | 'conquest';
@@ -23,6 +23,7 @@ export class App {
   private readonly game: Game;
   private readonly conquest: ConquestGame;
   private mode: Mode = 'title';
+  private difficulty: DifficultyId = loadDifficulty(); // 정복 난이도(타이틀에서 선택, 하이라이트·저장).
 
   constructor(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D) {
     this.ctx = ctx;
@@ -42,6 +43,13 @@ export class App {
     // 타이틀 화면 버튼 클릭 → 모드 진입(타이틀 상태에서만).
     this.titleInput.onClick((x, y) => {
       if (this.mode !== 'title') return;
+      // 난이도 버튼이 정복 모드 버튼 아래에 있으므로 먼저 판정한다(선택만 바꾸고 모드 진입 안 함).
+      const diff = hitDifficultyButton(canvas.width, canvas.height, x, y);
+      if (diff) {
+        this.difficulty = diff;
+        saveDifficulty(diff);
+        return;
+      }
       const hit = hitTitleButton(canvas.width, canvas.height, x, y);
       if (hit === 'defense') this.enterDefense();
       else if (hit === 'conquest') this.enterConquest();
@@ -78,6 +86,6 @@ export class App {
   private render(): void {
     if (this.mode === 'defense') this.game.render();
     else if (this.mode === 'conquest') this.conquest.render();
-    else renderTitle(this.ctx, this.game.best); // 타이틀(디펜스 최고기록 표시).
+    else renderTitle(this.ctx, this.game.best, this.difficulty); // 타이틀(최고기록 + 정복 난이도 선택).
   }
 }

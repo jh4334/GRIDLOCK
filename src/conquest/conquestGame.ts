@@ -8,6 +8,7 @@
 import conquestData from '../data/conquest.json';
 import { MouseInput, Keyboard } from '../core/input';
 import { AudioEngine } from '../core/audio';
+import { loadDifficulty, type DifficultyId } from '../core/storage';
 import { TILE, pixelToCell, cellToPixel } from '../game/grid';
 import { Controls } from '../ui/controls';
 import { ConquestWorld } from './conquestWorld';
@@ -42,6 +43,7 @@ export class ConquestGame {
   private readonly groups = new ConquestControlGroups();
 
   private world = new ConquestWorld();
+  private difficulty: DifficultyId = 'normal'; // 진입 시 저장값을 읽어 고정(재시작은 동일 유지).
   private placeKind: BuildKind | null = null;
   private attackMove = false; // A키 공격 이동 대기(좌클릭 지점으로 공격 이동).
   private hoverCell: { cx: number; cy: number } | null = null;
@@ -99,6 +101,9 @@ export class ConquestGame {
 
   // ── 모드 진입/정리 ───────────────────────────────────────────
   activate(): void {
+    // 진입 시점에 타이틀에서 고른 난이도를 확정한다. 이후 재시작(startWorld)은 이 값을 유지하고,
+    // 타이틀로 나갔다 다시 들어오면 새 선택을 반영한다.
+    this.difficulty = loadDifficulty();
     this.startWorld();
     this.setUiVisible(true);
     this.active = true;
@@ -111,7 +116,7 @@ export class ConquestGame {
 
   // 새 판 시작(진입·다시 시작 공통) — 월드·선택·UI 상태를 초기화한다.
   private startWorld(): void {
-    this.world = new ConquestWorld(this.audio);
+    this.world = new ConquestWorld(this.audio, this.difficulty);
     this.selection.reset();
     this.groups.reset();
     this.placeKind = null;
@@ -253,6 +258,7 @@ export class ConquestGame {
       popMax: w.popMax,
       secondsToAttack: w.secondsToAttack,
       unitCount: w.playerUnits.length,
+      difficulty: this.difficulty,
     });
     renderMinimap(ctx, this.minimapData());
     renderConquestOverlay(ctx, w.phase);

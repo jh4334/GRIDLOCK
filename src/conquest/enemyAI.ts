@@ -1,7 +1,8 @@
-// 적 AI(T12.4) — 결정적(랜덤 없음) 고정 빌드오더 + 90초 주기 공격 웨이브.
-//   경제: 적 HQ도 크리스탈 150 시작, 일꾼 2기로 자기 크리스탈 채집(플레이어와 동일 규칙·클래스).
-//   빌드오더: conquest.json enemy.buildOrder 순서대로 — 일꾼 생산 / 고정 좌표(enemy.layout)에 건설.
-//     적 일꾼이 실제로 이동·건설하고, 배럭은 완성 시 유닛 3기를 유지·리스폰(roster 공유).
+// 적 AI(T12.4, D3.3) — 결정적(랜덤 없음) 고정 빌드오더 + 주기 공격 웨이브.
+//   경제: 적 HQ도 난이도별 크리스탈로 시작, 일꾼 2기로 자기 크리스탈 채집(플레이어와 동일 규칙·클래스).
+//   빌드오더·공격 주기·시작 자원: 난이도(easy/normal/hard) 설정을 월드가 주입(conquest.json difficulty).
+//     빌드오더는 일꾼 생산 / 고정 좌표(enemy.layout)에 건설 — 적 일꾼이 실제로 이동·건설하고,
+//     배럭은 완성 시 유닛 3기를 유지·리스폰(roster 공유).
 //   웨이브: attackInterval초마다 대기 아닌 적 유닛 전원이 플레이어 HQ로 공격 이동(A*). waveDuration
 //     후 생존 유닛은 방어 위치로 복귀. 남은 시간은 코디네이터가 HUD에 표시한다.
 //
@@ -22,6 +23,13 @@ import { pathToStructure } from './conquestCombat';
 
 const C = conquestData;
 
+// 난이도별 적 진영 튜닝(conquest.json difficulty에서 월드가 골라 주입). 공격 주기·빌드오더·시작 자원.
+export interface DifficultySettings {
+  attackInterval: number;
+  buildOrder: (BuildKind | 'worker')[];
+  startCrystal: number;
+}
+
 export interface EnemyDeps {
   grid: ConquestGrid;
   crystals: Crystal[];
@@ -29,21 +37,24 @@ export interface EnemyDeps {
   playerHQ: HQ;
   buildings: Building[]; // 공유 — 적 건물을 push한다.
   units: CombatUnit[]; // 공유 — 웨이브 때 적 유닛 부분집합을 명령한다.
+  difficulty: DifficultySettings; // 난이도 설정(공격 주기·빌드오더·시작 자원).
   onBuildComplete(b: Building): void; // 배럭 완성 시 유닛 배치 등(월드 공유 로직).
   onWaveLaunch?(): void; // 공격 웨이브 출발 시(≥1기 출발) — 경보음 배선용.
 }
 
 export class EnemyAI {
   readonly workers: Worker[] = [];
-  crystal = C.enemy.startCrystal;
+  crystal: number;
 
   private stepIndex = 0;
   private readonly layoutIdx: Record<BuildKind, number> = { barracks: 0, turret: 0, depot: 0, factory: 0 };
-  private waveTimer = C.enemy.attackInterval;
+  private waveTimer: number;
   private waveActive = false;
   private recallTimer = 0;
 
   constructor(private deps: EnemyDeps) {
+    this.crystal = deps.difficulty.startCrystal;
+    this.waveTimer = deps.difficulty.attackInterval;
     for (let i = 0; i < C.enemy.workerCount; i++) this.spawnWorker();
   }
 
@@ -90,7 +101,7 @@ export class EnemyAI {
 
   // 빌드오더 한 스텝을 조건 충족 시 실행(자원·일꾼·칸). 미충족이면 대기(자원 축적).
   private executeBuildOrder(): void {
-    const order = C.enemy.buildOrder as (BuildKind | 'worker')[];
+    const order = this.deps.difficulty.buildOrder;
     if (this.stepIndex >= order.length) return;
     const step = order[this.stepIndex];
 
@@ -150,7 +161,7 @@ export class EnemyAI {
     this.waveTimer -= dt;
     if (this.waveTimer <= 0) {
       this.launchWave();
-      this.waveTimer = C.enemy.attackInterval;
+      this.waveTimer = this.deps.difficulty.attackInterval;
     }
     if (this.waveActive) {
       this.recallTimer -= dt;

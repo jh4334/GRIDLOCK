@@ -3,6 +3,7 @@
 // HTML(controls)이 담당한다.
 
 import type { ConquestPhase } from './conquestWorld';
+import type { DifficultyId } from '../core/storage';
 
 export interface ConquestHudInfo {
   crystal: number;
@@ -10,7 +11,15 @@ export interface ConquestHudInfo {
   popMax: number;
   secondsToAttack: number;
   unitCount: number; // 아군 전투 유닛 수(병력).
+  difficulty: DifficultyId; // 현재 정복 난이도(HUD 소형 표시).
 }
+
+// 난이도 소형 라벨(HUD·타이틀 공용 표기).
+export const DIFFICULTY_LABELS: Record<DifficultyId, string> = {
+  easy: '쉬움',
+  normal: '보통',
+  hard: '어려움',
+};
 
 const OVERLAY_BG = 'rgba(0, 0, 0, 0.72)';
 const COLOR_WIN = '#7bd67b';
@@ -31,10 +40,13 @@ export function renderConquestHud(ctx: CanvasRenderingContext2D, info: ConquestH
   ctx.fillStyle = popFull ? '#ff6b6b' : '#9ad0ff';
   ctx.fillText(`인구 ${info.popUsed}/${info.popMax}`, right, 28);
 
-  // 다음 공격 임박(10초 이하) 시 붉게 강조.
-  ctx.fillStyle = info.secondsToAttack <= 10 ? '#ff8a6a' : '#e0b357';
+  // 다음 공격 임박(10초 이하) 시 붉게 강조. 옆에 현재 난이도 소형 표시.
   ctx.textAlign = 'left';
-  ctx.fillText(`적 공격까지 ${info.secondsToAttack}초`, 8, 8);
+  ctx.fillStyle = info.secondsToAttack <= 10 ? '#ff8a6a' : '#e0b357';
+  const attackText = `적 공격까지 ${info.secondsToAttack}초 `;
+  ctx.fillText(attackText, 8, 8);
+  ctx.fillStyle = '#8fa8c8';
+  ctx.fillText(`[${DIFFICULTY_LABELS[info.difficulty]}]`, 8 + ctx.measureText(attackText).width, 8);
 
   // 아군 병력 수(배럭 선택 없이도 현재 병력 확인).
   ctx.fillStyle = '#9ad0ff';
