@@ -101,6 +101,7 @@ export class MeleeSystem {
     s.attackCooldown -= dt;
     if (s.attackCooldown <= 0) {
       s.attackCooldown = 1 / s.attackRate;
+      if (target.consumeShield()) return; // 실드(D4.1)가 첫 근접 피격을 흡수 — 데미지 없음.
       target.hp -= s.damage;
       if (target.hp <= 0 && !target.dead) {
         target.dead = true;

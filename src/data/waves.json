@@ -205,15 +205,21 @@
       },
       {
         "kind": "grunt",
-        "count": 10,
+        "count": 6,
         "interval": 0.6,
         "delay": 3
+      },
+      {
+        "kind": "shielded",
+        "count": 4,
+        "interval": 0.9,
+        "delay": 4
       }
     ],
     [
       {
         "kind": "runner",
-        "count": 16,
+        "count": 10,
         "interval": 0.4,
         "delay": 0
       },
@@ -222,12 +228,18 @@
         "count": 12,
         "interval": 0.22,
         "delay": 3
+      },
+      {
+        "kind": "splitter",
+        "count": 6,
+        "interval": 0.7,
+        "delay": 4
       }
     ],
     [
       {
         "kind": "tanker",
-        "count": 5,
+        "count": 3,
         "interval": 1,
         "delay": 0
       },
@@ -242,6 +254,12 @@
         "count": 8,
         "interval": 0.4,
         "delay": 5
+      },
+      {
+        "kind": "regen",
+        "count": 2,
+        "interval": 1.5,
+        "delay": 1
       }
     ],
     [
@@ -253,15 +271,21 @@
       },
       {
         "kind": "swarm",
-        "count": 12,
+        "count": 8,
         "interval": 0.2,
         "delay": 3
       },
       {
-        "kind": "runner",
-        "count": 12,
-        "interval": 0.4,
-        "delay": 6
+        "kind": "shielded",
+        "count": 4,
+        "interval": 0.8,
+        "delay": 5
+      },
+      {
+        "kind": "splitter",
+        "count": 4,
+        "interval": 0.7,
+        "delay": 7
       },
       {
         "kind": "tanker",
@@ -273,7 +297,7 @@
     [
       {
         "kind": "grunt",
-        "count": 14,
+        "count": 10,
         "interval": 0.55,
         "delay": 0
       },
@@ -284,9 +308,15 @@
         "delay": 3
       },
       {
-        "kind": "tanker",
-        "count": 4,
-        "interval": 1,
+        "kind": "regen",
+        "count": 2,
+        "interval": 1.5,
+        "delay": 4
+      },
+      {
+        "kind": "splitter",
+        "count": 5,
+        "interval": 0.7,
         "delay": 6
       }
     ],
@@ -305,15 +335,27 @@
       },
       {
         "kind": "grunt",
-        "count": 12,
+        "count": 8,
         "interval": 0.55,
         "delay": 4
       },
       {
-        "kind": "swarm",
-        "count": 12,
-        "interval": 0.2,
+        "kind": "shielded",
+        "count": 6,
+        "interval": 0.7,
+        "delay": 5
+      },
+      {
+        "kind": "splitter",
+        "count": 6,
+        "interval": 0.6,
         "delay": 7
+      },
+      {
+        "kind": "regen",
+        "count": 2,
+        "interval": 1.5,
+        "delay": 8
       },
       {
         "kind": "runner",

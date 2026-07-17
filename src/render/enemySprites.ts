@@ -9,6 +9,19 @@ import { withAlpha } from './palette';
 
 export type EnemyVisualKind = 'runner' | 'grunt' | 'tanker' | 'swarm' | 'boss';
 
+// 특수 능력 종(D4.1)은 전용 스프라이트 없이 기존 스킨을 재사용하고 벡터 오버레이로 구분한다.
+// (shielded→grunt, regen→tanker, splitter→runner). 그 외는 자기 자신을 그대로 쓴다.
+const VISUAL_SKIN: Record<string, EnemyVisualKind> = {
+  shielded: 'grunt',
+  regen: 'tanker',
+  splitter: 'runner',
+};
+
+/** 적 종류를 프리렌더된 기본 스킨 키로 매핑한다(특수 종은 베이스 스킨 재사용). */
+export function visualSkin(kind: string): EnemyVisualKind {
+  return VISUAL_SKIN[kind] ?? (kind as EnemyVisualKind);
+}
+
 // 종별 색(주 색 / 밝은 코어) — 마젠타·레드·오렌지 계열, 명도·형태로 구분.
 const COLORS: Record<EnemyVisualKind, { body: string; core: string }> = {
   runner: { body: '#ff7a5c', core: '#ffd9c0' }, // 오렌지 삼각 드론.
@@ -134,6 +147,61 @@ export function drawSlowOverlay(ctx: CanvasRenderingContext2D, x: number, y: num
   ctx.beginPath();
   ctx.arc(x, y, r + 1, 0, Math.PI * 2);
   ctx.stroke();
+  ctx.restore();
+}
+
+/** 실드 링(D4.1) — 실드가 살아있는 동안 몸통을 감싸는 하늘색 육각 링(느린 회전). */
+export function drawShieldRing(ctx: CanvasRenderingContext2D, x: number, y: number, r: number): void {
+  const rr = r + 4;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(animTime() * 0.6);
+  ctx.strokeStyle = 'rgba(120, 210, 255, 0.9)';
+  ctx.lineWidth = 2;
+  ctx.shadowColor = 'rgba(120, 210, 255, 0.8)';
+  ctx.shadowBlur = 6;
+  polygon(ctx, 0, 0, rr, 6, 0);
+  ctx.stroke();
+  ctx.restore();
+}
+
+/** 재생(D4.1) — 맥동하는 초록 링(+회복 중 '+' 표식). 어두운 외곽선으로 초원 배경에서도 대비 확보. */
+export function drawRegenPulse(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, healing: boolean): void {
+  const pulse = 0.5 + 0.5 * Math.sin(animTime() * 5); // 0~1.
+  ctx.save();
+  ctx.strokeStyle = `rgba(70, 245, 120, ${0.55 + 0.4 * pulse})`;
+  ctx.lineWidth = 2;
+  ctx.shadowColor = 'rgba(0, 50, 15, 0.9)';
+  ctx.shadowBlur = 4;
+  ctx.beginPath();
+  ctx.arc(x, y, r + 3 + pulse * 2, 0, Math.PI * 2);
+  ctx.stroke();
+  // 회복 중이면 몸통 위에 초록 '+' 표식(HP바 왼쪽) — 재생임을 명확히 알린다.
+  if (healing) {
+    const px = x - r - 5;
+    const py = y - r - 6;
+    ctx.strokeStyle = 'rgba(120, 255, 150, 0.95)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(px - 3, py); ctx.lineTo(px + 3, py);
+    ctx.moveTo(px, py - 3); ctx.lineTo(px, py + 3);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/** 분열 러너 표식(D4.1) — 러너 스킨 위에 작은 이중 코어(두 개의 밝은 점)를 얹는다. */
+export function drawSplitMark(ctx: CanvasRenderingContext2D, x: number, y: number, facing: number, r: number): void {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(facing);
+  ctx.fillStyle = 'rgba(230, 200, 255, 0.95)';
+  const off = r * 0.35;
+  for (const dy of [-off, off]) {
+    ctx.beginPath();
+    ctx.arc(-off * 0.4, dy, 2, 0, Math.PI * 2);
+    ctx.fill();
+  }
   ctx.restore();
 }
 

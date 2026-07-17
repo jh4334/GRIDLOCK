@@ -15,7 +15,7 @@ import { AudioEngine } from '../core/audio';
 import { ScreenShake } from './screenShake';
 import { DecalField } from '../render/decals';
 import { Vignette } from '../render/vignette';
-import { Enemy, createEnemy } from '../entities/enemy';
+import { Enemy, createEnemy, spawnSplits } from '../entities/enemy';
 import { towerSpec, TowerKind } from '../entities/tower';
 import towersData from '../data/towers.json';
 import { Hud } from '../ui/hud';
@@ -203,8 +203,7 @@ export class Game {
     for (const e of this.enemies) e.reroute(this.flowField);
   }
 
-  // ── 웨이브 / 배속 ──────────────────────────────────────────────
-  // 웨이브 클리어·얼리콜 공통 보너스 지급(골드 + 사운드).
+  // ── 웨이브 / 배속 ── 클리어·얼리콜 공통 보너스 지급(골드 + 사운드).
   private awardBonus(bonus: number): void { this.economy.addGold(bonus); this.audio.waveClear(); }
 
   private startNextWave(): void {
@@ -255,6 +254,7 @@ export class Game {
     // 전투(타겟팅·발사·명중·데미지·처치 골드)는 combat 시스템이 담당.
     this.combat.update(dt, this.interaction.towers, this.enemies, this.economy, this.flowField);
     for (const e of this.enemies) if (e.reachedBase) { this.economy.loseLife(1); this.vignette.trigger(); }
+    spawnSplits(this.enemies, this.flowField); // 분열(D4.1) — 죽은 분열체의 자식을 filter 전에 추가(웨이브 카운트 포함).
     this.enemies = this.enemies.filter((e) => !e.dead && !e.reachedBase);
 
     // 이펙트·잔해 데칼은 서브스텝 안에서 갱신 → 배속 시 페이드도 같은 배율로 진행된다.

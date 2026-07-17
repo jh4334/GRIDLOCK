@@ -146,6 +146,9 @@ export class CombatSystem {
 
   // 데미지 → 처치 시 골드(1회) → 슬로우. 처치 골드는 dead 전환 순간에만 지급.
   private applyHit(e: Enemy, p: Projectile, economy: Economy): void {
+    // 실드(D4.1): 남아있으면 이번 피격을 전부 흡수 — 데미지·슬로우 없이 실드만 1 소모.
+    // 스플래시는 적마다 applyHit이 호출되므로 각 적의 실드도 1회씩 소모된다.
+    if (e.consumeShield()) return;
     if (p.slowFactor > 0) e.applySlow(p.slowFactor, p.slowDuration);
     e.hp -= p.damage;
     this.cb.onDamage?.(e.x, e.y, p.damage); // 명중 지점 데미지 팝업.

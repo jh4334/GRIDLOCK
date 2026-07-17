@@ -5,7 +5,7 @@
 // DOM 재구성은 구성이 실제로 바뀔 때만(lastKey 비교) — 매 프레임 갱신 금지(waves.ts 참조).
 
 import { getSprite } from '../render/sprites';
-import '../render/enemySprites'; // enemy/<kind> 벡터 빌더 등록 보장(사이드이펙트 import).
+import { visualSkin } from '../render/enemySprites'; // enemy/<kind> 벡터 빌더 등록(사이드이펙트) + 스킨 매핑.
 import type { WaveComposition } from '../game/waves';
 
 const ICON = 20; // 아이콘 캔버스 한 변(px).
@@ -39,7 +39,8 @@ export class WavePreview {
       canvas.height = ICON;
       canvas.className = 'wp-icon';
       const cx = canvas.getContext('2d');
-      if (cx) cx.drawImage(getSprite(`enemy/${kind}`), 0, 0, ICON, ICON);
+      // 특수 종(shielded/regen/splitter)은 전용 스프라이트가 없으므로 베이스 스킨으로 매핑한다.
+      if (cx) cx.drawImage(getSprite(`enemy/${visualSkin(kind)}`), 0, 0, ICON, ICON);
       const label = document.createElement('span');
       label.className = 'wp-count';
       label.textContent = `×${count}`;
