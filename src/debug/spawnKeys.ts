@@ -6,7 +6,8 @@
 import type { Keyboard } from '../core/input';
 import type { EnemyKind } from '../entities/enemy';
 
-const STAGGER = 0.15; // 초. 연속 스폰 간격.
+const STAGGER = 0.08; // 초. 연속 스폰 간격. (D5.1 스웜 스트레스 테스트에서 4연타로 120+ 동시
+                      // 유지가 가능하도록 드립 속도를 높였다 — 밸런스가 아닌 디버그 편의 상수.)
 const SWARM_COUNT = 12; // 스웜 무리 크기(DESIGN.md).
 
 export class DebugSpawner {

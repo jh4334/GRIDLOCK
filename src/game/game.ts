@@ -23,6 +23,7 @@ import { BuildMenu } from '../ui/buildMenu';
 import { Controls } from '../ui/controls';
 import { WaveManager } from './waves';
 import { DebugCheats } from '../debug/cheats';
+import { publishStressTelemetry } from '../debug/stressTelemetry';
 import { Interaction } from './interaction';
 import { UnitSelection } from './unitSelection';
 import { bindGameInput } from './gameInput';
@@ -238,6 +239,7 @@ export class Game {
     }
 
     this.syncUi();
+    publishStressTelemetry(this.enemies.length, this.flow.state === 'playing'); // D5.1 스트레스 하네스(읽기 전용).
   }
 
   // 게임 월드 1스텝(적·전투·라이프·필터·웨이브·승패). 배속 시 이 함수만 반복된다.
