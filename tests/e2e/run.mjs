@@ -70,7 +70,7 @@ async function main() {
   // 스모크(회귀) → 난이도 데모 순으로 실행. 하나라도 실패하면 그 코드를 전파하고 나머지는 건너뛴다.
   let code = 1;
   try {
-    for (const suite of ['smoke.mjs', 'difficulty-demo.mjs', 'endless-demo.mjs']) {
+    for (const suite of ['smoke.mjs', 'difficulty-demo.mjs', 'endless-demo.mjs', 'map-demo.mjs']) {
       code = await run(process.execPath, [join(HERE, suite)], {
         stdio: 'inherit',
         env: { ...process.env, BASE_URL },

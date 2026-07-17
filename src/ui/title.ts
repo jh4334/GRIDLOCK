@@ -2,13 +2,14 @@
 // 상태 변경 없는 순수 렌더. 버튼 클릭 판정(hitTitleButton)은 App이 받아 모드를 전환한다.
 // 최고기록 문자열 포맷(formatBest)은 승/패 오버레이와 공유한다.
 
-import type { BestRecord, DifficultyId } from '../core/storage';
+import type { BestRecord, DifficultyId, MapId } from '../core/storage';
 import { animTime } from '../render/sprites';
 
 const COLOR_LOGO = '#e6d38f'; // STEEL GRID — 초원 전장 톤(앰버/올리브).
 const COLOR_SUB = '#a8b48a';
 const COLOR_BEST = '#e0b357';
 const COLOR_NEON_CONQUEST = '#ff4d6a';
+const COLOR_NEON_DEFENSE = '#39d5ff'; // 디펜스 네온(맵 선택 버튼 강조에도 재사용).
 
 export type TitleMode = 'defense' | 'conquest';
 
@@ -32,6 +33,15 @@ const DIFF_ORDER: { id: DifficultyId; label: string }[] = [
 const DBTN_W = 74;
 const DBTN_H = 34;
 const DBTN_GAP = 6;
+
+// 디펜스 맵 선택(D4.4) — 디펜스 버튼 바로 아래 2개 소형 버튼(평원/협곡). 난이도 버튼 패턴 재사용.
+const MAP_ORDER: { id: MapId; label: string }[] = [
+  { id: 'classic', label: '평원' },
+  { id: 'canyon', label: '협곡' },
+];
+const MBTN_W = 112;
+const MBTN_H = 34;
+const MBTN_GAP = 6;
 
 // 두 모드 버튼의 사각형(렌더·클릭 판정 공유). 캔버스 크기에 맞춰 가운데 정렬.
 export function titleButtons(w: number, h: number): { defense: Rect; conquest: Rect } {
@@ -74,6 +84,24 @@ export function hitDifficultyButton(w: number, h: number, px: number, py: number
   return null;
 }
 
+// 맵 버튼 2개 사각형(렌더·클릭 판정 공유). 디펜스 버튼 중앙 아래에 가로로 정렬(D4.4).
+export function mapButtons(w: number, h: number): { id: MapId; rect: Rect }[] {
+  const defense = titleButtons(w, h).defense;
+  const totalW = MBTN_W * MAP_ORDER.length + MBTN_GAP * (MAP_ORDER.length - 1);
+  const startX = defense.x + defense.w / 2 - totalW / 2;
+  const y = defense.y + defense.h + 22;
+  return MAP_ORDER.map((m, i) => ({
+    id: m.id,
+    rect: { x: startX + i * (MBTN_W + MBTN_GAP), y, w: MBTN_W, h: MBTN_H },
+  }));
+}
+
+/** 클릭 좌표가 어느 맵 버튼 위인지. 아니면 null. */
+export function hitMapButton(w: number, h: number, px: number, py: number): MapId | null {
+  for (const m of mapButtons(w, h)) if (inside(m.rect, px, py)) return m.id;
+  return null;
+}
+
 /** 최고기록 한 줄 문자열. 없으면 안내 문구. (승/패 오버레이와 공유) */
 export function formatBest(best: BestRecord | null): string {
   if (!best) return '최고 기록: 없음';
@@ -85,6 +113,7 @@ export function renderTitle(
   ctx: CanvasRenderingContext2D,
   best: BestRecord | null,
   difficulty: DifficultyId,
+  mapId: MapId, // 선택된 디펜스 맵(평원/협곡) — 버튼 하이라이트(D4.4).
   endlessBest = 0, // 엔드리스 최고 도달 웨이브(0이면 표시 안 함, D4.3).
 ): void {
   const w = ctx.canvas.width;
@@ -117,6 +146,8 @@ export function renderTitle(
   drawButton(ctx, b.defense, '디펜스 모드', '#39d5ff', '20웨이브 생존');
   drawButton(ctx, b.conquest, '정복 모드', COLOR_NEON_CONQUEST, '본진 정복 RTS');
 
+  // 디펜스 맵 선택(현재 선택 하이라이트, D4.4).
+  drawMapButtons(ctx, w, h, mapId);
   // 정복 난이도 선택(현재 선택 하이라이트).
   drawDifficultyButtons(ctx, w, h, difficulty);
 
@@ -197,6 +228,42 @@ function drawDifficultyButtons(ctx: CanvasRenderingContext2D, w: number, h: numb
     ctx.textBaseline = 'middle';
     ctx.font = `${selected ? 'bold ' : ''}15px system-ui, sans-serif`;
     ctx.fillText(DIFF_ORDER[i].label, rect.x + rect.w / 2, rect.y + rect.h / 2);
+  }
+}
+
+// 맵 2버튼 — 현재 선택은 디펜스 네온(시안)으로 강조, 나머지는 어둡게(D4.4). 캔버스 렌더.
+function drawMapButtons(ctx: CanvasRenderingContext2D, w: number, h: number, current: MapId): void {
+  const btns = mapButtons(w, h);
+  const first = btns[0].rect;
+
+  ctx.save();
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.font = '13px system-ui, sans-serif';
+  ctx.fillStyle = 'rgba(200, 220, 255, 0.55)';
+  ctx.fillText('맵', first.x, first.y - 12);
+  ctx.restore();
+
+  for (let i = 0; i < btns.length; i++) {
+    const { rect } = btns[i];
+    const selected = btns[i].id === current;
+    ctx.save();
+    ctx.fillStyle = selected ? 'rgba(20, 44, 56, 0.9)' : 'rgba(20, 28, 44, 0.85)';
+    ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+    ctx.strokeStyle = selected ? COLOR_NEON_DEFENSE : 'rgba(120, 170, 230, 0.35)';
+    if (selected) {
+      ctx.shadowColor = COLOR_NEON_DEFENSE;
+      ctx.shadowBlur = 10;
+    }
+    ctx.lineWidth = selected ? 2 : 1;
+    ctx.strokeRect(rect.x + 1, rect.y + 1, rect.w - 2, rect.h - 2);
+    ctx.restore();
+
+    ctx.fillStyle = selected ? '#d7f4ff' : 'rgba(200, 220, 255, 0.6)';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = `${selected ? 'bold ' : ''}15px system-ui, sans-serif`;
+    ctx.fillText(MAP_ORDER[i].label, rect.x + rect.w / 2, rect.y + rect.h / 2);
   }
 }
 

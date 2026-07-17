@@ -162,3 +162,31 @@ export function saveDifficulty(id: DifficultyId): void {
     // 저장 실패는 게임 진행에 영향 없음 — 무시.
   }
 }
+
+// ── 디펜스 맵 선택(D4.4) ──────────────────────────────────────────
+// 타이틀에서 고른 디펜스 맵(평원/협곡)을 gridlock.map에 저장·복원한다.
+// 값이 없거나 손상/예외면 기본값 'classic'(평원) — 현행 지형. 최고기록은 맵 구분 없이 공용.
+
+export type MapId = 'classic' | 'canyon';
+
+const MAP_KEY = 'gridlock.map';
+
+/** 저장된 디펜스 맵을 읽는다. 없거나 손상/예외면 'classic'. */
+export function loadMapId(): MapId {
+  try {
+    const raw = localStorage.getItem(MAP_KEY);
+    if (raw === 'classic' || raw === 'canyon') return raw;
+  } catch {
+    // 접근 예외는 무시하고 기본값으로.
+  }
+  return 'classic';
+}
+
+/** 디펜스 맵 저장. 예외(프라이빗 모드 등)는 조용히 무시. */
+export function saveMapId(id: MapId): void {
+  try {
+    localStorage.setItem(MAP_KEY, id);
+  } catch {
+    // 저장 실패는 게임 진행에 영향 없음 — 무시.
+  }
+}

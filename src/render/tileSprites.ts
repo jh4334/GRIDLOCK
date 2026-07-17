@@ -235,6 +235,37 @@ export function drawCrystal(ctx: CanvasRenderingContext2D, x: number, y: number,
   ctx.restore();
 }
 
+// ── 바위(정적 장애물) ────────────────────────────────────────────
+// 협곡 맵(D4.4)의 건설·통행 불가 칸. 스킨 로드 시 Kenney meteorGrey_big로 교체(assetLoader).
+// 로드 전엔 이 벡터 폴백(해시 변주 회색 7각형 + 상단 하이라이트)을 그린다.
+defineSprite('tile/rock', () => buildRock());
+
+function buildRock(): HTMLCanvasElement {
+  const s = TILE, c = s / 2, r = s * 0.4, pts = 7;
+  const { canvas, ctx } = createSpriteCanvas(s, s);
+  ctx.beginPath();
+  for (let i = 0; i < pts; i++) {
+    const a = (i / pts) * Math.PI * 2 - Math.PI / 2;
+    const j = (0.78 + hash01(i, pts, 7) * 0.28) * r; // 해시 변주(결정적).
+    ctx[i === 0 ? 'moveTo' : 'lineTo'](c + Math.cos(a) * j, c + Math.sin(a) * j);
+  }
+  ctx.closePath();
+  const g = ctx.createLinearGradient(c - r, c - r, c + r, c + r);
+  g.addColorStop(0, '#8a8f96'); g.addColorStop(0.5, '#6b7178'); g.addColorStop(1, '#4c5157');
+  ctx.fillStyle = g; ctx.fill();
+  ctx.strokeStyle = 'rgba(24, 27, 31, 0.85)'; ctx.lineWidth = 2; ctx.stroke();
+  ctx.fillStyle = withAlpha('#c9ced4', 0.5); // 상단 하이라이트(입체감).
+  ctx.beginPath();
+  ctx.ellipse(c - r * 0.18, c - r * 0.28, r * 0.32, r * 0.2, -0.5, 0, Math.PI * 2);
+  ctx.fill();
+  return canvas;
+}
+
+/** 바위 그리기 — 칸 중심 (x, y)에 스프라이트를 찍는다. Grid 정적 레이어가 1회 호출(D4.4). */
+export function drawRock(ctx: CanvasRenderingContext2D, x: number, y: number): void {
+  ctx.drawImage(getSprite('tile/rock'), x - TILE / 2, y - TILE / 2);
+}
+
 // ── 공용 헬퍼 ────────────────────────────────────────────────────
 function drawRotated(ctx: CanvasRenderingContext2D, img: CanvasImageSource, x: number, y: number, a: number, alpha: number): void {
   const w = (img as HTMLCanvasElement).width;

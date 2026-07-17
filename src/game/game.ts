@@ -180,14 +180,12 @@ export class Game {
     });
   }
 
-  /** 최고기록(타이틀 화면 표시용) — App이 읽는다. */
-  get best(): BestRecord | null {
-    return this.flow.best;
-  }
+  get best(): BestRecord | null { return this.flow.best; } // 최고기록(타이틀 표시) — App이 읽는다.
   get endlessBest(): number { return this.flow.endlessBest; } // 엔드리스 최고 웨이브(타이틀 표시, D4.3).
 
-  /** 정복→디펜스 진입 — 월드 초기화 + 게임 시작(menu→playing). App이 호출. */
-  activate(): void {
+  /** 정복→디펜스 진입 — 선택 맵 바위 주입 + 월드 초기화 + 시작. 재시작은 resetWorld가 같은 맵 유지(D4.4). */
+  activate(rocks: [number, number][]): void {
+    this.grid.setMap(rocks);
     this.flow.startGame();
     this.active = true;
   }

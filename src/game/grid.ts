@@ -8,16 +8,18 @@ export const COLS = 20;
 export const ROWS = 14;
 export const TILE = 48;
 
-// 지형 바닥·스폰 포털·기지 리액터 스프라이트(STEEL GRID 아트 패스).
-import { paintGroundFloor, drawPortal, drawReactor } from '../render/tileSprites';
+// 지형 바닥·스폰 포털·기지 리액터·바위 스프라이트(STEEL GRID 아트 패스).
+import { paintGroundFloor, drawPortal, drawReactor, drawRock } from '../render/tileSprites';
 import { onAssetsReady } from '../render/sprites';
+import type { RockCell } from './maps';
 
 // 스폰: 좌측 중앙 / 기지: 우측 중앙.
 export const SPAWN = { cx: 0, cy: 7 } as const;
 export const BASE = { cx: COLS - 1, cy: 7 } as const;
 
-// 칸 상태 — M1에서는 빈 칸/타워 두 종류. 스폰·기지는 별도 특수 칸으로 표시한다.
-export type CellState = 'empty' | 'tower';
+// 칸 상태 — 빈 칸/타워/바위. 스폰·기지는 별도 특수 칸으로 표시한다.
+// 'rock'(D4.4): 맵이 미리 배치한 장애물 — 통행·건설·판매 불가(정적, 게임 중 불변).
+export type CellState = 'empty' | 'tower' | 'rock';
 
 // ── 좌표 변환 유틸 ─────────────────────────────────────────────
 // 인자 px, py 는 이미 캔버스 픽셀 좌표계로 보정된 값이어야 한다 (core/input.ts 참고).
@@ -44,8 +46,10 @@ export class Grid {
 
   // 1차원 배열로 관리 (index = cy * COLS + cx).
   private cells: CellState[];
-  // 정적 바닥+격자+스폰/기지 표시를 1회 프리렌더해 둔 오프스크린 캔버스.
+  // 정적 바닥+격자+스폰/기지+바위 표시를 1회 프리렌더해 둔 오프스크린 캔버스.
   private staticLayer: HTMLCanvasElement;
+  // 현재 맵의 바위 칸(정적). resetCells가 재주입하고 buildStaticLayer가 그린다(D4.4).
+  private rocks: RockCell[] = [];
 
   constructor() {
     this.cells = new Array(COLS * ROWS).fill('empty');
@@ -64,9 +68,9 @@ export class Grid {
     return cx >= 0 && cx < COLS && cy >= 0 && cy < ROWS;
   }
 
-  /** 적이 지나갈 수 있는 칸인가 (범위 안 + 타워 아님). 스폰·기지는 빈 칸이라 통행 가능. */
+  /** 적이 지나갈 수 있는 칸인가 (범위 안 + 빈 칸). 타워·바위는 벽. 스폰·기지는 빈 칸이라 통행 가능. */
   isWalkable(cx: number, cy: number): boolean {
-    return this.inBounds(cx, cy) && this.cells[this.index(cx, cy)] !== 'tower';
+    return this.inBounds(cx, cy) && this.cells[this.index(cx, cy)] === 'empty';
   }
 
   getState(cx: number, cy: number): CellState | undefined {
@@ -79,9 +83,23 @@ export class Grid {
     this.cells[this.index(cx, cy)] = state;
   }
 
-  /** 재시작 — 모든 칸을 빈 칸으로 되돌린다(정적 레이어는 스폰/기지 고정이라 그대로). */
+  /** 재시작 — 타워를 걷어내고 맵의 바위는 유지한다(같은 맵으로 재플레이). */
   resetCells(): void {
     this.cells.fill('empty');
+    for (const [cx, cy] of this.rocks) {
+      if (this.inBounds(cx, cy)) this.cells[this.index(cx, cy)] = 'rock';
+    }
+  }
+
+  /**
+   * 맵 로드(D4.4) — 바위 좌표를 주입해 정적 지형을 세팅한다. 디펜스 진입 시 App→Game이 호출.
+   * 칸을 바위로 세우고 정적 레이어를 재빌드(바위 스프라이트를 바닥 위에 굽는다). 재시작은
+   * resetCells가 같은 바위를 되살려 같은 맵을 유지한다.
+   */
+  setMap(rocks: RockCell[]): void {
+    this.rocks = rocks.map(([cx, cy]) => [cx, cy] as RockCell);
+    this.resetCells();
+    this.staticLayer = this.buildStaticLayer();
   }
 
   isSpawn(cx: number, cy: number): boolean {
@@ -102,6 +120,11 @@ export class Grid {
 
     // 초원 지형 바닥 + 옅은 격자선(1회 프리렌더). 스폰/기지는 애니메이션이라 render에서 동적으로.
     paintGroundFloor(c, COLS, ROWS, 'grass');
+    // 바위(정적 장애물)는 바닥 위에 함께 구워 둔다 — 게임 중 불변이라 매 프레임 그릴 필요 없음(D4.4).
+    for (const [cx, cy] of this.rocks) {
+      const { x, y } = cellCenter(cx, cy);
+      drawRock(c, x, y);
+    }
     return layer;
   }
 

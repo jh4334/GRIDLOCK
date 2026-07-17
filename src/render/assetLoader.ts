@@ -34,7 +34,7 @@ const FILES = [
   'tank_blue', 'tank_red', 'tank_green', 'tank_sand',
   'tileGrass1', 'tileGrass2', 'tileSand1', 'tileSand2', 'tracksDouble', 'tracksSmall',
   'flagRed1', 'flagGreen1', 'flagYellow1', 'gemGreen', 'gemBlue', 'gold_3',
-  'laserBlue01', 'laserRed01', 'meteorGrey_tiny1',
+  'laserBlue01', 'laserRed01', 'meteorGrey_tiny1', 'meteorGrey_big1',
   // 동적 도로 경로(디펜스) — 가로/세로 직선 + 코너 4종.
   'tileGrass_roadEast', 'tileGrass_roadNorth',
   'tileGrass_roadCornerUL', 'tileGrass_roadCornerUR', 'tileGrass_roadCornerLL', 'tileGrass_roadCornerLR',
@@ -222,6 +222,9 @@ function applySkin(I: Record<string, Img>): void {
   setSprite('tile/reactor/red', bakeFlagOn(I['tankBody_bigRed_outline'], I['flagRed1'], S, 42));
   setSprite('tile/reactor-ring/cyan', emptyCanvas());
   setSprite('tile/reactor-ring/red', emptyCanvas());
+
+  // 협곡 맵 바위(D4.4) — 회색 운석을 칸에 꽉 차게(장애물 실루엣). 벡터 폴백을 교체.
+  setSprite('tile/rock', bakeCentered(I['meteorGrey_big1'], S, 46, 0));
 
   // 스폰 포털 = 궤적+레드 깃발, 크리스탈 = 초록 젬(펄스 글로우는 tileSprites가 유지).
   setSprite('tile/portal', bakePortal(I['tracksDouble'], I['flagRed1'], S));
