@@ -17,6 +17,7 @@ const PAD = 5;
 const SIZE = (BASE_R + PAD) * 2;
 
 for (const team of Object.keys(TEAM) as Team[]) defineSprite(`unit/trooper/${team}`, () => buildTrooper(team));
+for (const team of Object.keys(TEAM) as Team[]) defineSprite(`unit/artillery/${team}`, () => buildArtillery(team));
 defineSprite('unit/worker', () => buildWorker());
 
 function buildTrooper(team: Team): HTMLCanvasElement {
@@ -63,6 +64,60 @@ function buildTrooper(team: Team): HTMLCanvasElement {
   return canvas;
 }
 
+// 포격 전차 벡터 폴백 — 병사와 구분되게 각진 차체 + 앞으로 뻗은 긴 포신 + 이중 쉐브론(원거리 표식).
+function buildArtillery(team: Team): HTMLCanvasElement {
+  const { canvas, ctx } = createSpriteCanvas(SIZE, SIZE);
+  const c = SIZE / 2;
+  const { body, core, chevron } = TEAM[team];
+
+  // 외곽 글로우.
+  const g = ctx.createRadialGradient(c, c, 1, c, c, BASE_R + PAD);
+  g.addColorStop(0, withAlpha(body, 0.45));
+  g.addColorStop(1, withAlpha(body, 0));
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(c, c, BASE_R + PAD, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 긴 포신(앞쪽 +x, 차체 밖으로 돌출) — 포격 전차의 실루엣.
+  ctx.strokeStyle = core;
+  ctx.lineWidth = 3.5;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(c, c);
+  ctx.lineTo(c + BASE_R + PAD - 1, c);
+  ctx.stroke();
+
+  // 각진 차체(둥근 사각) — 병사의 원형과 구분.
+  ctx.fillStyle = body;
+  ctx.strokeStyle = withAlpha('#0a1424', 0.8);
+  ctx.lineWidth = 1.5;
+  const s = BASE_R * 0.82;
+  ctx.beginPath();
+  ctx.rect(c - s, c - s, s * 2, s * 2);
+  ctx.fill();
+  ctx.stroke();
+
+  // 발광 코어.
+  ctx.fillStyle = core;
+  ctx.beginPath();
+  ctx.arc(c, c, BASE_R * 0.38, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 이중 쉐브론(원거리 변형 표식).
+  ctx.strokeStyle = chevron;
+  ctx.lineWidth = 1.8;
+  ctx.lineJoin = 'round';
+  for (const off of [-3, 1]) {
+    ctx.beginPath();
+    ctx.moveTo(c - 3 + off, c - BASE_R * 0.5);
+    ctx.lineTo(c + BASE_R * 0.45 + off, c);
+    ctx.lineTo(c - 3 + off, c + BASE_R * 0.5);
+    ctx.stroke();
+  }
+  return canvas;
+}
+
 function buildWorker(): HTMLCanvasElement {
   const { canvas, ctx } = createSpriteCanvas(SIZE, SIZE);
   const c = SIZE / 2;
@@ -105,6 +160,11 @@ function buildWorker(): HTMLCanvasElement {
 /** 병사/전투유닛 — 진영 코어 + 쉐브론(facing 회전). radius로 스케일. */
 export function drawTrooper(ctx: CanvasRenderingContext2D, team: Team, x: number, y: number, facing: number, radius: number): void {
   drawScaledRotated(ctx, getSprite(`unit/trooper/${team}`), x, y, facing, radius / BASE_R);
+}
+
+/** 포격 전차 — 긴 포신 실루엣(facing 회전). radius로 스케일. */
+export function drawArtillery(ctx: CanvasRenderingContext2D, team: Team, x: number, y: number, facing: number, radius: number): void {
+  drawScaledRotated(ctx, getSprite(`unit/artillery/${team}`), x, y, facing, radius / BASE_R);
 }
 
 /** 일꾼 — 앰버 코어 + 클로(facing 회전) + 운반 표시(민트 점). */

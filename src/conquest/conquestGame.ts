@@ -21,7 +21,7 @@ import type { BuildKind } from './building';
 import type { ConquestPhase } from './conquestWorld';
 
 const SPEEDS = [1, 2, 3];
-const BUILD_LABELS: Record<BuildKind, string> = { barracks: '배럭', turret: '포탑', depot: '보급고' };
+const BUILD_LABELS: Record<BuildKind, string> = { barracks: '배럭', turret: '포탑', depot: '보급고', factory: '공장' };
 const GHOST_OK = 'rgba(90, 220, 120, 0.35)';
 const GHOST_BAD = 'rgba(230, 70, 70, 0.35)';
 

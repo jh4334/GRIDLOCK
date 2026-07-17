@@ -13,7 +13,7 @@ import { drawHpBar } from '../render/hpbar';
 import { ALLY_CYAN, FOE_RED } from '../render/palette';
 import type { Side } from './hq';
 
-export type BuildKind = 'barracks' | 'turret' | 'depot';
+export type BuildKind = 'barracks' | 'turret' | 'depot' | 'factory';
 
 const HP_BAR_H = 4;
 const HP_BAR_GAP = 7;
@@ -67,6 +67,9 @@ export class Building {
   }
   get isTurret(): boolean {
     return this.kind === 'turret';
+  }
+  get isFactory(): boolean {
+    return this.kind === 'factory';
   }
 
   // Combatant 계약(공격 대상) — 완성된 건물만 타겟이 된다.

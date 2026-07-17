@@ -6,7 +6,7 @@
 // 사거리 내 적 Combatant를 향해 이동해 접촉 시 공격한다. 수치는 conquest.json에서 주입.
 
 import { pixelToCell } from '../game/grid';
-import { drawTrooper } from '../render/unitSprites';
+import { drawTrooper, drawArtillery } from '../render/unitSprites';
 import { drawHpBar } from '../render/hpbar';
 import { ALLY_CYAN, FOE_ORANGE } from '../render/palette';
 import type { Side } from './hq';
@@ -29,10 +29,12 @@ export interface Combatant {
 export interface UnitStats {
   hp: number;
   damage: number;
-  attackRate: number; // 근접 공속(회/s).
+  attackRate: number; // 근접 공속(회/s) 또는 원거리 발사율.
   speed: number; // px/s.
   radius: number; // px.
   color: string;
+  range?: number; // 원거리 유닛의 사거리(px). 미지정이면 0(근접).
+  isRanged?: boolean; // true면 접촉 없이 사거리 내 적에게 투사체 발사(포격 전차).
 }
 
 // 유닛 렌더 상수(밸런스 아님, 시각 상수).
@@ -46,6 +48,8 @@ export class CombatUnit implements Combatant {
   readonly damage: number;
   readonly attackRate: number;
   readonly color: string;
+  readonly range: number; // 원거리 사거리(px). 근접이면 0.
+  readonly isRanged: boolean; // true면 원거리(포격 전차) — combat이 투사체로 교전한다.
   readonly structure = false;
 
   x: number;
@@ -81,6 +85,8 @@ export class CombatUnit implements Combatant {
     this.speed = stats.speed;
     this.radius = stats.radius;
     this.color = stats.color;
+    this.range = stats.range ?? 0;
+    this.isRanged = stats.isRanged ?? false;
     this.home = home;
     this.guardX = x;
     this.guardY = y;
@@ -123,7 +129,9 @@ export class CombatUnit implements Combatant {
 
   // 읽기 전용 렌더 — 진영 코어 + 방향 쉐브론 스프라이트 + HP바.
   render(ctx: CanvasRenderingContext2D): void {
-    drawTrooper(ctx, this.side === 'player' ? 'ally' : 'foe', this.x, this.y, this.facing, this.radius);
+    const team = this.side === 'player' ? 'ally' : 'foe';
+    if (this.isRanged) drawArtillery(ctx, team, this.x, this.y, this.facing, this.radius);
+    else drawTrooper(ctx, team, this.x, this.y, this.facing, this.radius);
     drawHpBar(
       ctx,
       this.x - this.radius,

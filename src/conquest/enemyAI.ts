@@ -38,7 +38,7 @@ export class EnemyAI {
   crystal = C.enemy.startCrystal;
 
   private stepIndex = 0;
-  private readonly layoutIdx: Record<BuildKind, number> = { barracks: 0, turret: 0, depot: 0 };
+  private readonly layoutIdx: Record<BuildKind, number> = { barracks: 0, turret: 0, depot: 0, factory: 0 };
   private waveTimer = C.enemy.attackInterval;
   private waveActive = false;
   private recallTimer = 0;

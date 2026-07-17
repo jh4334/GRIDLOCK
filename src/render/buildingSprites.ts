@@ -6,14 +6,14 @@ import { TILE } from '../game/grid';
 import { createSpriteCanvas, defineSprite, getSprite, animTime } from './sprites';
 import { withAlpha, ALLY_CYAN, ALLY_BLUE, FOE_RED, GOLD, PLATE_DARK } from './palette';
 
-export type BuildVisualKind = 'barracks' | 'turret' | 'depot';
+export type BuildVisualKind = 'barracks' | 'turret' | 'depot' | 'factory';
 export type BuildSide = 'player' | 'enemy';
 
 const S = TILE;
 const INSET = 4;
 const SIDE_EDGE: Record<BuildSide, string> = { player: ALLY_CYAN, enemy: FOE_RED };
 
-for (const kind of ['barracks', 'turret', 'depot'] as BuildVisualKind[]) {
+for (const kind of ['barracks', 'turret', 'depot', 'factory'] as BuildVisualKind[]) {
   for (const side of ['player', 'enemy'] as BuildSide[]) {
     defineSprite(`building/${kind}/${side}`, () => buildStructure(kind, side));
   }
@@ -63,7 +63,7 @@ function buildStructure(kind: BuildVisualKind, side: BuildSide): HTMLCanvasEleme
     ctx.fillStyle = edge;
     ctx.fillRect(c, c - 5, 13 * dir, 3);
     ctx.fillRect(c, c + 2, 13 * dir, 3);
-  } else {
+  } else if (kind === 'depot') {
     // 보급고 — 3×3 격자 컨테이너.
     ctx.strokeStyle = withAlpha(edge, 0.6);
     ctx.lineWidth = 1;
@@ -79,6 +79,28 @@ function buildStructure(kind: BuildVisualKind, side: BuildSide): HTMLCanvasEleme
       ctx.lineTo(g0 + (w - 8), g0 + i * cell);
       ctx.stroke();
     }
+  } else {
+    // 차량 공장 — 차고 셔터 + 포신 실루엣(차량 생산 표식).
+    ctx.fillStyle = '#0d1420';
+    roundPath(ctx, c - 10, c - 8, 20, 16, 3);
+    ctx.fill();
+    ctx.strokeStyle = withAlpha(edge, 0.75);
+    ctx.lineWidth = 1;
+    for (let i = -2; i <= 2; i++) {
+      ctx.beginPath();
+      ctx.moveTo(c - 9, c + i * 3);
+      ctx.lineTo(c + 9, c + i * 3);
+      ctx.stroke();
+    }
+    // 돌출 포신(진영 방향).
+    const dir = side === 'player' ? 1 : -1;
+    ctx.strokeStyle = edge;
+    ctx.lineWidth = 3;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(c, c + 9);
+    ctx.lineTo(c + 12 * dir, c + 9);
+    ctx.stroke();
   }
   return canvas;
 }

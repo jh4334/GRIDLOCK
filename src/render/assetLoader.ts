@@ -174,6 +174,8 @@ function buildProjectiles(I: Record<string, Img>): void {
   setSprite('fx/proj/#f0a45a', bakeBolt(I['meteorGrey_tiny1'], 16, 16, false)); // 캐논 포탄.
   setSprite('fx/proj/#bfe8f7', bakeBolt(I['gemBlue'], 15, 15, false)); // 프로스트 결정탄.
   setSprite('fx/proj/#ffcf9a', bakeBolt(I['laserRed01'], 24, 9, true)); // 정복 적 포탑.
+  setSprite('fx/proj/#b7f7a0', bakeBolt(I['meteorGrey_tiny1'], 18, 18, false)); // 정복 아군 포격 전차 포탄.
+  setSprite('fx/proj/#ff9a6a', bakeBolt(I['meteorGrey_tiny1'], 18, 18, false)); // 정복 적 포격 전차 포탄.
 }
 
 // 로드된 이미지들로 전 스프라이트 key를 교체한다.
@@ -200,6 +202,10 @@ function applySkin(I: Record<string, Img>): void {
   setSprite('unit/trooper/foe', bakeCentered(I['tank_red'], 32, 30));
   setSprite('unit/worker', bakeCentered(I['tank_green'], 32, 30));
 
+  // 포격 전차 — 전차 차체 + 긴 barrel3 합성(병사와 구분되는 긴 포신 실루엣).
+  setSprite('unit/artillery/ally', bakeComposite(I['tankBody_blue_outline'], I['tankBlue_barrel3_outline'], 40, 30));
+  setSprite('unit/artillery/foe', bakeComposite(I['tankBody_red_outline'], I['tankRed_barrel3_outline'], 40, 30));
+
   // 정복 건물 — 포탑(진영색 차체+포신)·배럭(사막 차체+깃발)·보급고(사막 타일+골드).
   setSprite('building/turret/player', bakeComposite(I['tankBody_blue_outline'], I['tankBlue_barrel1_outline'], S, 40, ROT_E));
   setSprite('building/turret/enemy', bakeComposite(I['tankBody_red_outline'], I['tankRed_barrel1_outline'], S, 40, -ROT_E));
@@ -207,6 +213,9 @@ function applySkin(I: Record<string, Img>): void {
   setSprite('building/barracks/enemy', bakeFlagOn(I['tankBody_sand_outline'], I['flagRed1'], S, 40));
   setSprite('building/depot/player', bakeDepot(I['tileSand1'], I['gold_3'], S, ALLY_CYAN));
   setSprite('building/depot/enemy', bakeDepot(I['tileSand1'], I['gold_3'], S, FOE_RED));
+  // 차량 공장 — 어두운 대형 차체 + 진영 깃발(배럭보다 무거운 실루엣으로 구분).
+  setSprite('building/factory/player', bakeFlagOn(I['tankBody_darkLarge_outline'], I['flagGreen1'], S, 42));
+  setSprite('building/factory/enemy', bakeFlagOn(I['tankBody_darkLarge_outline'], I['flagRed1'], S, 42));
 
   // 본진(리액터 key 재사용) — 아군 = 초록 깃발+블루 차체, 적 = 레드 깃발+빅레드 차체. 회전 링 제거.
   setSprite('tile/reactor/cyan', bakeFlagOn(I['tankBody_blue_outline'], I['flagGreen1'], S, 42));

@@ -60,8 +60,10 @@ export class ConquestCombat {
   private updateUnit(dt: number, u: CombatUnit, units: CombatUnit[], buildings: Building[], playerHQ: HQ, enemyHQ: HQ): void {
     // 교전 태세: 공격 이동 / 지정 타겟 보유 / 경로 없이 대기(방어) 중이면 전체 사거리로 유닛·건물 모두 감지.
     // 반대로 일반 이동 중(경로 있음·비교전)에는 감지 반경을 절반으로 줄이고 건물을 무시해 목적지로 관통한다.
+    // 원거리 유닛(포격 전차)은 감지·교전 기준이 자신의 사거리(range), 근접 유닛은 공용 engageRadius.
     const engaging = u.attackMove || u.orderedTarget !== null || u.path.length === 0;
-    const radius = engaging ? C.unit.engageRadius : C.unit.engageRadius * C.unit.moveDetectFactor;
+    const base = u.isRanged ? u.range : C.unit.engageRadius;
+    const radius = engaging ? base : base * C.unit.moveDetectFactor;
     const r2 = radius * radius;
 
     // (1) 사거리 내 최근접 적 유닛 우선.
@@ -70,7 +72,9 @@ export class ConquestCombat {
     if (!target && engaging) target = this.nearestEnemyStructure(u, buildings, playerHQ, enemyHQ, r2);
 
     if (target) {
-      this.engage(dt, u, target);
+      // 원거리는 접촉 없이 투사체 발사, 근접은 접근 후 접촉 공격.
+      if (u.isRanged) this.engageRanged(dt, u, target);
+      else this.engage(dt, u, target);
       return;
     }
     // 교전 대상 없음 → 명령 경로 추종, 없으면 집결지 방어.
@@ -99,6 +103,29 @@ export class ConquestCombat {
         }
       }
     }
+  }
+
+  // 원거리 교전 — 제자리에서 발사 쿨다운마다 대상을 유도하는 투사체를 쏜다(접근·접촉 없음).
+  private engageRanged(dt: number, u: CombatUnit, target: Combatant): void {
+    u.attackCooldown -= dt;
+    if (u.attackCooldown > 0) return;
+    u.attackCooldown = 1 / u.attackRate;
+    const A = C.artillery;
+    this.projectiles.push({
+      x: u.x,
+      y: u.y,
+      px: u.x,
+      py: u.y,
+      speed: A.projectileSpeed,
+      radius: A.projectileRadius,
+      color: u.side === 'player' ? A.playerProjectileColor : A.enemyProjectileColor,
+      damage: u.damage,
+      target,
+      ax: target.x,
+      ay: target.y,
+      miss: PROJ_LIFE_MISS,
+      dead: false,
+    });
   }
 
   private nearestEnemyUnit(u: CombatUnit, units: CombatUnit[], r2: number): CombatUnit | null {

@@ -13,7 +13,7 @@ import { HQ } from './hq';
 import { Building, BuildKind } from './building';
 import { Worker, WorkerContext } from './worker';
 import { CombatUnit, Combatant } from './combatUnit';
-import { spawnUnitsFor, maintainBarracks } from './roster';
+import { spawnUnitsFor, maintainRoster } from './roster';
 import { ConquestCombat, pathToStructure } from './conquestCombat';
 import { EnemyAI } from './enemyAI';
 
@@ -175,7 +175,7 @@ export class ConquestWorld {
 
   // 건설 완료 부수효과(양 진영 공통) — 배럭은 유닛 배치, 플레이어 보급고는 인구 상한 증가.
   private onBuildComplete(b: Building): void {
-    if (b.isBarracks) spawnUnitsFor(b, this.units, this.grid);
+    if (b.isBarracks || b.isFactory) spawnUnitsFor(b, this.units, this.grid);
     else if (b.kind === 'depot' && b.side === 'player') this.depotsBuilt++;
     if (b.side === 'player') this.audio?.buildDone(); // 플레이어 건설 완료음.
   }
@@ -265,7 +265,7 @@ export class ConquestWorld {
     for (const w of this.workers) w.update(dt, ctx);
     this.enemyAI.update(dt);
 
-    for (const b of this.buildings) if (b.isBarracks) maintainBarracks(dt, b, this.units);
+    for (const b of this.buildings) if (b.isBarracks || b.isFactory) maintainRoster(dt, b, this.units);
     this.combat.update(dt, this.units, this.buildings, this.playerHQ, this.enemyHQ);
     this.effects.update(dt);
 

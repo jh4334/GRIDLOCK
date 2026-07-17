@@ -89,6 +89,20 @@
     "playerColor": "#6fc0ff",
     "enemyColor": "#ff8a6a"
   },
+  "artillery": {
+    "hp": 40,
+    "damage": 14,
+    "attackRate": 0.8,
+    "speed": 65,
+    "radius": 9,
+    "range": 140,
+    "projectileSpeed": 320,
+    "projectileRadius": 6,
+    "playerColor": "#8ad0ff",
+    "enemyColor": "#ffb070",
+    "playerProjectileColor": "#b7f7a0",
+    "enemyProjectileColor": "#ff9a6a"
+  },
   "buildings": {
     "barracks": {
       "cost": 150,
@@ -115,6 +129,14 @@
       "buildTime": 3,
       "hp": 200,
       "popBonus": 4
+    },
+    "factory": {
+      "cost": 200,
+      "buildTime": 8,
+      "hp": 350,
+      "unitCount": 2,
+      "respawnTime": 16,
+      "rallyRadius": 24
     }
   },
   "enemy": {
@@ -128,6 +150,7 @@
       "depot",
       "barracks",
       "barracks",
+      "factory",
       "turret"
     ],
     "layout": {
@@ -144,6 +167,12 @@
         ],
         [
           18,
+          4
+        ]
+      ],
+      "factory": [
+        [
+          16,
           4
         ]
       ],
