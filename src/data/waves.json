@@ -1,0 +1,34 @@
+{
+  "totalWaves": 20,
+  "hpScalePerWave": 1.15,
+  "waves": [
+    [{ "kind": "grunt", "count": 6, "interval": 0.8, "delay": 0 }],
+    [{ "kind": "grunt", "count": 8, "interval": 0.7, "delay": 0 }],
+    [{ "kind": "runner", "count": 8, "interval": 0.5, "delay": 0 }],
+    [
+      { "kind": "grunt", "count": 6, "interval": 0.8, "delay": 0 },
+      { "kind": "runner", "count": 4, "interval": 0.5, "delay": 1.5 }
+    ],
+    [
+      { "kind": "boss", "count": 1, "interval": 2.0, "delay": 0 },
+      { "kind": "grunt", "count": 4, "interval": 0.8, "delay": 1.0 }
+    ],
+    [{ "kind": "swarm", "count": 12, "interval": 0.25, "delay": 0 }],
+    [
+      { "kind": "tanker", "count": 3, "interval": 1.2, "delay": 0 },
+      { "kind": "runner", "count": 6, "interval": 0.5, "delay": 2.0 }
+    ],
+    [
+      { "kind": "swarm", "count": 12, "interval": 0.25, "delay": 0 },
+      { "kind": "runner", "count": 6, "interval": 0.5, "delay": 3.0 }
+    ],
+    [
+      { "kind": "tanker", "count": 5, "interval": 1.2, "delay": 0 },
+      { "kind": "grunt", "count": 8, "interval": 0.8, "delay": 1.5 }
+    ],
+    [
+      { "kind": "boss", "count": 1, "interval": 2.0, "delay": 0 },
+      { "kind": "swarm", "count": 12, "interval": 0.25, "delay": 1.5 }
+    ]
+  ]
+}

@@ -28,6 +28,12 @@ export class CombatSystem {
   private projectiles: Projectile[] = [];
   private explosions: Explosion[] = [];
 
+  /** 재시작 — 진행 중인 투사체·폭발을 모두 비운다. */
+  reset(): void {
+    this.projectiles = [];
+    this.explosions = [];
+  }
+
   update(dt: number, towers: Tower[], enemies: Enemy[], economy: Economy, field: FlowField): void {
     this.fireTowers(dt, towers, enemies, field);
     this.updateProjectiles(dt, enemies, economy);

@@ -55,11 +55,12 @@ export class Enemy {
   private slowFactor = 0; // 이속 감소 비율(0 = 감속 없음).
   private slowTimer = 0; // 남은 감속 시간(초).
 
-  constructor(kind: EnemyKind, field: FlowField) {
+  // hpMultiplier: 웨이브 스케일(HP = 기본 × 배율). 디버그 스폰은 1(기본).
+  constructor(kind: EnemyKind, field: FlowField, hpMultiplier = 1) {
     const spec = enemiesData[kind] as EnemySpec;
     this.kind = kind;
-    this.maxHp = spec.hp;
-    this.hp = spec.hp;
+    this.maxHp = Math.round(spec.hp * hpMultiplier);
+    this.hp = this.maxHp;
     this.speed = spec.speed;
     this.reward = spec.reward;
     this.color = spec.color;
@@ -214,7 +215,7 @@ export class Enemy {
   }
 }
 
-/** 스폰 칸에서 지정 종류의 적을 생성한다. */
-export function createEnemy(kind: EnemyKind, field: FlowField): Enemy {
-  return new Enemy(kind, field);
+/** 스폰 칸에서 지정 종류의 적을 생성한다. hpMultiplier로 웨이브 스케일 HP를 적용한다. */
+export function createEnemy(kind: EnemyKind, field: FlowField, hpMultiplier = 1): Enemy {
+  return new Enemy(kind, field, hpMultiplier);
 }

@@ -11,6 +11,12 @@ export class Economy {
     this.lives = economyData.startLives;
   }
 
+  /** 재시작 — 시작값으로 되돌린다. */
+  reset(): void {
+    this.gold = economyData.startGold;
+    this.lives = economyData.startLives;
+  }
+
   addGold(amount: number): void {
     this.gold += amount;
   }

@@ -77,6 +77,11 @@ export class Grid {
     this.cells[this.index(cx, cy)] = state;
   }
 
+  /** 재시작 — 모든 칸을 빈 칸으로 되돌린다(정적 레이어는 스폰/기지 고정이라 그대로). */
+  resetCells(): void {
+    this.cells.fill('empty');
+  }
+
   isSpawn(cx: number, cy: number): boolean {
     return cx === SPAWN.cx && cy === SPAWN.cy;
   }

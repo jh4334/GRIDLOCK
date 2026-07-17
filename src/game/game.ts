@@ -17,6 +17,11 @@ import towersData from '../data/towers.json';
 import economyData from '../data/economy.json';
 import { Hud } from '../ui/hud';
 import { BuildMenu } from '../ui/buildMenu';
+import { Controls } from '../ui/controls';
+import { renderOverlay } from '../ui/overlay';
+import { WaveManager } from './waves';
+import type { GameState } from './state';
+import { DebugCheats, renderHitboxes } from '../debug/cheats';
 
 // 시각 상수(밸런스 아님).
 const COLOR_HOVER = 'rgba(255, 255, 255, 0.18)';
@@ -25,6 +30,9 @@ const COLOR_GHOST_BAD = 'rgba(230, 70, 70, 0.35)'; // 설치 불가 칸
 const COLOR_REJECT = '#ff4040'; // 봉쇄 거부 플래시
 const GHOST_ALPHA = 0.5; // 고스트 타워 반투명도
 const REJECT_FLASH_TIME = 0.3; // 거부 플래시 지속(초)
+
+// 배속 옵션(구조 상수 — 서브스텝 반복 횟수). 밸런스 수치 아님.
+const SPEEDS = [1, 2, 3];
 
 interface Flash {
   cx: number;
@@ -50,13 +58,19 @@ export class Game {
   private readonly buildMenu: BuildMenu;
   private readonly spawner: DebugSpawner;
   private readonly combat = new CombatSystem();
+  private readonly controls: Controls;
+  private readonly waveManager: WaveManager;
 
   private flowField: FlowField;
   private enemies: Enemy[] = [];
   private towers: Tower[] = [];
 
+  private state: GameState = 'playing';
+  private speed = 1; // 배속(서브스텝 반복 횟수). update가 게임 월드를 이 횟수만큼 갱신.
+
   private hoverCell: { cx: number; cy: number } | null = null;
   private showFlowDebug = false;
+  private showHitbox = false; // H 치트로 토글하는 히트박스 오버레이.
 
   private placeKind: TowerKind | null = null; // 설치 모드 대상(없으면 비설치 모드).
   private selectedTower: Tower | null = null; // 선택된 타워(판매 대상).
@@ -73,6 +87,31 @@ export class Game {
 
     this.spawner = new DebugSpawner(this.keyboard, (kind) => {
       this.enemies.push(createEnemy(kind, this.flowField));
+    });
+
+    // 웨이브 스포너 — 스폰 시점의 flowField를 클로저로 주입(설치/판매로 바뀌어도 최신값 사용).
+    this.waveManager = new WaveManager({
+      spawn: (kind, hpMult) => this.enemies.push(createEnemy(kind, this.flowField, hpMult)),
+      onWaveClear: (_wave, bonus) => this.economy.addGold(bonus),
+      onVictory: () => {
+        this.state = 'won';
+      },
+    });
+
+    this.controls = new Controls({
+      speeds: SPEEDS,
+      onNextWave: () => this.startNextWave(),
+      onSetSpeed: (s) => this.setSpeed(s),
+      onRestart: () => this.restart(),
+    });
+    this.controls.setActiveSpeed(this.speed);
+
+    new DebugCheats(this.keyboard, {
+      addGold: (n) => this.economy.addGold(n),
+      skipWave: () => this.skipWave(),
+      toggleHitboxes: () => {
+        this.showHitbox = !this.showHitbox;
+      },
     });
 
     this.buildMenu = new BuildMenu({
@@ -92,6 +131,7 @@ export class Game {
     });
     this.keyboard.on('escape', () => this.handleEscape());
     this.keyboard.on('x', () => this.sellSelected());
+    this.keyboard.on('r', () => this.restart()); // 승리/패배 후 다시 시작.
   }
 
   start(): void {
@@ -193,10 +233,53 @@ export class Game {
     for (const e of this.enemies) e.reroute(this.flowField);
   }
 
+  // ── 웨이브 / 배속 / 재시작 ──────────────────────────────────────
+  private startNextWave(): void {
+    if (this.state !== 'playing') return;
+    this.waveManager.startNextWave();
+  }
+
+  // N 치트 — 필드의 적을 보상 없이 제거하고 현재 웨이브를 즉시 완료 처리.
+  private skipWave(): void {
+    if (this.state !== 'playing') return;
+    this.enemies = [];
+    this.waveManager.skip();
+  }
+
+  private setSpeed(s: number): void {
+    this.speed = s;
+    this.controls.setActiveSpeed(s);
+  }
+
+  // 재시작 — 페이지 리로드 없이 상태를 리셋(리스너·DOM은 재생성하지 않는다).
+  private restart(): void {
+    if (this.state === 'playing') return; // 승리/패배 상태에서만 재시작.
+    this.economy.reset();
+    this.enemies = [];
+    this.towers = [];
+    this.grid.resetCells();
+    this.combat.reset();
+    this.waveManager.reset();
+    this.recomputeField();
+
+    this.state = 'playing';
+    this.setSpeed(1);
+    this.exitPlaceMode();
+    this.deselect();
+    this.flash = null;
+    this.ghost = null;
+    this.showHitbox = false;
+
+    this.lastGold = this.economy.gold;
+    this.buildMenu.updateAffordability(this.economy.gold);
+    this.controls.showRestart(false);
+  }
+
   // ── update / render ─────────────────────────────────────────
+  // FPS·입력(호버/고스트)·플래시는 프레임당 1회, 게임 월드 갱신은 배속만큼 반복한다.
+  // (배속은 dt를 키우지 않고 update(dt)를 N회 호출 — 슬로우/쿨다운 타이머 정확도 유지.)
   private update(dt: number): void {
     this.fps.update(dt);
-    this.spawner.update(dt);
 
     // 호버 칸.
     if (this.input.isInside) {
@@ -214,11 +297,24 @@ export class Game {
       this.ghost = null;
     }
 
-    // 거부 플래시 페이드아웃(타이머 감소만 여기서).
+    // 거부 플래시 페이드아웃(실시간 기준 — 타이머 감소만 여기서).
     if (this.flash) {
       this.flash.timer -= dt;
       if (this.flash.timer <= 0) this.flash = null;
     }
+
+    // 게임 월드는 playing 상태에서만, 배속 수만큼 서브스텝으로 갱신.
+    if (this.state === 'playing') {
+      for (let i = 0; i < this.speed; i++) this.updateWorld(dt);
+    }
+
+    this.syncUi();
+  }
+
+  // 게임 월드 1스텝(적·전투·라이프·필터·웨이브·승패). 배속 시 이 함수만 반복된다.
+  private updateWorld(dt: number): void {
+    if (this.state !== 'playing') return; // 서브스텝 중 승/패 전환 시 잔여 스텝 중단.
+    this.spawner.update(dt);
 
     for (const e of this.enemies) e.update(dt, this.flowField);
     // 전투(타겟팅·발사·명중·데미지·처치 골드)는 combat 시스템이 담당.
@@ -226,11 +322,21 @@ export class Game {
     for (const e of this.enemies) if (e.reachedBase) this.economy.loseLife(1);
     this.enemies = this.enemies.filter((e) => !e.dead && !e.reachedBase);
 
-    // 골드가 변했을 때만 빌드 메뉴 활성/비활성 갱신(원인 무관하게 일관 유지).
+    // 웨이브 진행/완료 판정(스폰도 여기서 발생). 완료 판정은 스폰 이후의 실제 적 수로.
+    this.waveManager.update(dt, () => this.enemies.length);
+
+    if (this.economy.isDefeated) this.state = 'lost';
+  }
+
+  // 상태 변화에 따른 UI 동기화(프레임당 1회). 골드 변동 시에만 빌드 메뉴 갱신.
+  private syncUi(): void {
     if (this.economy.gold !== this.lastGold) {
       this.lastGold = this.economy.gold;
       this.buildMenu.updateAffordability(this.economy.gold);
     }
+    // 다음 웨이브 버튼은 진행 중 + 대기 상태 + 남은 웨이브가 있을 때만 활성.
+    this.controls.setNextWaveEnabled(this.state === 'playing' && this.waveManager.canStart);
+    this.controls.showRestart(this.state !== 'playing');
   }
 
   private render(): void {
@@ -249,7 +355,14 @@ export class Game {
     for (const e of this.enemies) e.render(ctx);
     this.combat.render(ctx); // 투사체·폭발은 적 위에 그린다.
 
-    this.hud.render(ctx, this.economy);
+    if (this.showHitbox) renderHitboxes(ctx, this.enemies, this.towers); // H 치트.
+
+    this.hud.render(ctx, this.economy, {
+      current: this.waveManager.current,
+      total: this.waveManager.total,
+    });
+    // 승리/패배 오버레이는 HUD 위, FPS 아래로 그린다.
+    renderOverlay(ctx, this.state, this.waveManager.current, this.waveManager.total);
     this.fps.render(ctx);
   }
 

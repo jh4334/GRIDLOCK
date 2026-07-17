@@ -23,6 +23,69 @@
         background: #24242c;
         image-rendering: pixelated;
       }
+      #controls {
+        margin-top: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        width: 960px;
+      }
+      .next-wave-btn {
+        padding: 8px 18px;
+        background: #2e5a7a;
+        color: #e6f2ff;
+        border: 2px solid #4080a8;
+        border-radius: 6px;
+        font-family: inherit;
+        font-size: 14px;
+        cursor: pointer;
+      }
+      .next-wave-btn:hover:not(:disabled) {
+        background: #33668a;
+      }
+      .next-wave-btn:disabled {
+        color: #6a6a72;
+        background: #24242a;
+        border-color: #3a3a46;
+        cursor: not-allowed;
+      }
+      .speed-group {
+        display: flex;
+        gap: 4px;
+      }
+      .speed-btn {
+        min-width: 40px;
+        padding: 8px 10px;
+        background: #2c2c36;
+        color: #e0e0e0;
+        border: 2px solid #3a3a46;
+        border-radius: 6px;
+        font-family: inherit;
+        font-size: 14px;
+        cursor: pointer;
+      }
+      .speed-btn:hover {
+        border-color: #6a6a7a;
+      }
+      .speed-btn.active {
+        border-color: #7bd67b;
+        background: #33413a;
+        color: #d8ffd8;
+      }
+      .restart-btn {
+        padding: 8px 18px;
+        background: #7a2e2e;
+        color: #ffe0e0;
+        border: 2px solid #a04040;
+        border-radius: 6px;
+        font-family: inherit;
+        font-size: 14px;
+        cursor: pointer;
+      }
+      .restart-btn:hover {
+        background: #993333;
+      }
       #build-menu {
         margin-top: 12px;
         display: flex;
@@ -91,6 +154,7 @@
   <body>
     <div id="app">
       <canvas id="game-canvas" width="960" height="672"></canvas>
+      <div id="controls"></div>
       <div id="build-menu"></div>
     </div>
     <script type="module" src="/src/main.ts"></script>
