@@ -58,7 +58,8 @@ async function main() {
     // 이전 실행의 엔드리스 기록이 남아 판정을 흐리지 않게 초기화한 뒤 시작한다.
     stage = 'enter';
     await page.goto(BASE_URL);
-    await page.evaluate(() => localStorage.removeItem('gridlock.endless'));
+    // v2 스키마(D5.2): 기록은 통합 gridlock.save에 있으므로 그 키를 비운다.
+    await page.evaluate(() => { localStorage.removeItem('gridlock.save'); localStorage.removeItem('gridlock.endless'); });
     await page.reload();
     await page.waitForTimeout(1100); // 에셋 로드 대기(assetsReady).
     const { box, s, pt } = await canvasMapper(page);
@@ -118,7 +119,10 @@ async function main() {
     check(lost, '무방비 방치 60초 내 패배하지 않음(라이프 0 미도달)');
 
     // 엔드리스 도달 웨이브가 기록되었는지 확인(21 이상).
-    const rec = await page.evaluate(() => Number(localStorage.getItem('gridlock.endless') ?? 0));
+    const rec = await page.evaluate(() => {
+      try { return Number(JSON.parse(localStorage.getItem('gridlock.save') ?? '{}').endlessBest ?? 0); }
+      catch { return 0; }
+    });
     check(rec >= 21, `엔드리스 기록이 저장되지 않음(기대 ≥21, 실제 ${rec})`);
 
     // ── 타이틀 복귀 → 엔드리스 기록 표시 ──

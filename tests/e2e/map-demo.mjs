@@ -70,7 +70,11 @@ async function runCanyon(page) {
   stage = 'select-canyon';
   await page.mouse.click(...pt(...MAP_CANYON));
   await page.waitForTimeout(150);
-  const saved = await page.evaluate(() => localStorage.getItem('gridlock.map'));
+  // v2 스키마(D5.2): 통합 gridlock.save 객체의 map 필드를 본다.
+  const saved = await page.evaluate(() => {
+    try { return (JSON.parse(localStorage.getItem('gridlock.save') ?? '{}').map) ?? null; }
+    catch { return null; }
+  });
   check(saved === 'canyon', `맵 선택이 저장되지 않음(기대 canyon, 실제 ${saved})`);
 
   // 디펜스 진입 → 협곡 지형 적용 + 인게임 UI 노출.

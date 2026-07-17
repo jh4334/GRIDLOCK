@@ -68,7 +68,11 @@ async function runDifficulty(page, diffBtn, expectId, shot) {
   stage = `${expectId}-select`;
   await page.mouse.click(...pt(...diffBtn));
   await page.waitForTimeout(150);
-  const saved = await page.evaluate(() => localStorage.getItem('gridlock.difficulty'));
+  // v2 스키마(D5.2): 개별 키가 아니라 통합 gridlock.save 객체의 difficulty 필드를 본다.
+  const saved = await page.evaluate(() => {
+    try { return (JSON.parse(localStorage.getItem('gridlock.save') ?? '{}').difficulty) ?? null; }
+    catch { return null; }
+  });
   check(saved === expectId, `난이도 선택이 저장되지 않음(기대 ${expectId}, 실제 ${saved})`);
 
   // 정복 진입 → 인게임 UI 노출 확인.
