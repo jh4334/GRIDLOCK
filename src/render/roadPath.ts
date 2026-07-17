@@ -11,8 +11,8 @@
 // ── 코너 매핑 근거(Kenney tileGrass_roadCorner*) ──────────────────
 // 실제 PNG 픽셀 분석으로 각 코너가 잇는 두 변을 확정: UL=상+좌, UR=상+우, LL=하+좌, LR=하+우.
 
-import { FlowField } from '../systems/pathfinding';
-import { SPAWN, BASE, COLS, ROWS, TILE, cellToPixel } from '../game/grid';
+import { FlowField, computeFlowField } from '../systems/pathfinding';
+import { SPAWN, BASE, COLS, ROWS, TILE, cellToPixel, type Grid } from '../game/grid';
 import { getSprite, assetsReady } from './sprites';
 
 export type RoadKind = 'h' | 'v' | 'ul' | 'ur' | 'll' | 'lr';
@@ -98,6 +98,18 @@ export function computeRoadCells(field: FlowField): RoadPiece[] {
     pieces.push({ cx: cur.cx, cy: cur.cy, kind: pieceKind(inDx, inDy, outDx, outDy) });
   }
   return pieces;
+}
+
+/**
+ * D2.2 미리보기 — 고스트 칸(cx,cy)을 임시 벽으로 세운 상태의 예상 경로 조각을 계산해 돌려준다.
+ * isPathClear의 임시 벽 패턴과 동일하게 계산 후 칸 상태를 반드시 원복한다. 봉쇄면 빈 배열.
+ */
+export function computePreviewCells(grid: Grid, cx: number, cy: number): RoadPiece[] {
+  const prev = grid.getState(cx, cy) ?? 'empty';
+  grid.setState(cx, cy, 'tower');
+  const cells = computeRoadCells(computeFlowField(grid));
+  grid.setState(cx, cy, prev); // 원복
+  return cells;
 }
 
 // ── 렌더 ─────────────────────────────────────────────────────────

@@ -1,8 +1,7 @@
 // 타워 설치/판매/선택 상호작용 — 마우스 클릭·호버, 설치 모드 고스트, 봉쇄 거부 플래시.
 // 배럭 전용 상호작용·렌더는 barracksInteraction.ts로 분리(M10). 동작 변화 없음.
-// 타워 배열과 선택/설치 모드 상태는 이 클래스가 소유하고, Game이 소유·조율한다.
-// 필드 재계산·적 목록은 Game이 소유하므로 콜백/게터로 주입받는다(설치·판매 후 최신값 사용).
-// update(dt)/render(ctx) 분리 규칙 유지 — 상태 변경은 update 계열에서만, render는 읽기 전용.
+// 타워 배열과 선택/설치 모드 상태는 이 클래스가 소유하고, Game이 조율한다. 필드 재계산·적 목록은
+// Game 소유라 콜백/게터로 주입받는다. update/render 분리 — 상태 변경은 update 계열만, render는 읽기 전용.
 
 import type { MouseInput } from '../core/input';
 import type { Grid } from './grid';
@@ -13,6 +12,7 @@ import { Tower, towerSpec, TowerKind } from '../entities/tower';
 import { drawTower, type TowerVisualKind } from '../render/towerSprites';
 import { barracksList, barracksPanelSig, setRallyFromClick, renderUnits, createTower, towerPanelInfo, sellRefund } from './barracksInteraction';
 import { isCellPlaceable, isPathClear } from '../systems/placement';
+import { PathPreview } from './pathPreview';
 import type { BuildMenu } from '../ui/buildMenu';
 import { Toast, MSG_GOLD, MSG_BLOCKADE, MSG_OCCUPIED } from '../ui/toast';
 
@@ -52,6 +52,7 @@ export class Interaction {
   private flash: Flash | null = null; // 봉쇄 거부 피드백.
   private hoverCell: { cx: number; cy: number } | null = null;
   private readonly toast = new Toast(); // 설치 불가 사유 안내(D2.1). update가 타이머 관리, render는 읽기만.
+  private readonly preview = new PathPreview(); // D2.2 예상 경로 미리보기. updateHover가 계산, render는 읽기만.
 
   constructor(private deps: InteractionDeps) {}
 
@@ -113,8 +114,7 @@ export class Interaction {
     setRallyFromClick(this.deps.grid, this.selectedTower, px, py);
   }
 
-  // 선택된 타워의 정보 패널을 현재 스탯·골드로 다시 그린다(선택/업그레이드/골드 변동 시).
-  // 패널 값 구성은 barracksInteraction.towerPanelInfo가 담당한다(interaction.ts 300줄 제한).
+  // 선택된 타워 정보 패널을 현재 스탯·골드로 다시 그린다. 값 구성은 barracksInteraction.towerPanelInfo가 담당.
   private showPanel(): void {
     const t = this.selectedTower;
     this.deps.buildMenu.showTowerPanel(t ? towerPanelInfo(t, this.deps.economy.gold) : null);
@@ -125,8 +125,7 @@ export class Interaction {
     if (this.selectedTower) this.showPanel();
   }
 
-  // 배럭 선택 시 병사 수/리스폰이 실시간으로 바뀌므로, 표시값이 변할 때만 패널을 다시 그린다
-  // (매 프레임 DOM 재생성·버튼 깜빡임 방지). Game이 프레임당 1회 호출.
+  // 배럭 선택 시 병사 수/리스폰이 실시간 변하므로 표시값이 변할 때만 패널을 다시 그린다(DOM 재생성·깜빡임 방지).
   private lastPanelSig = '';
   updatePanel(): void {
     const sig = barracksPanelSig(this.selectedTower, this.deps.economy.gold);
@@ -199,8 +198,7 @@ export class Interaction {
     this.deps.recomputeField(); // 판매로 열린 길 반영 + 전 적 reroute.
   }
 
-  // ── update(상태 변경) ────────────────────────────────────────
-  // 호버 칸 + 설치 모드 고스트 계산. 설치 가능 여부(기본 조건)는 여기서, render는 읽기만.
+  // ── update(상태 변경) — 호버 칸 + 설치 고스트 + 예상 경로 계산. render는 읽기만. ──
   updateHover(input: MouseInput): void {
     if (input.isInside) {
       const { cx, cy } = pixelToCell(input.x, input.y);
@@ -215,6 +213,9 @@ export class Interaction {
     } else {
       this.ghost = null;
     }
+    // 예상 경로는 고스트를 따른다(유효 고스트일 때만·호버 칸 변경 시에만 재계산). 비설치·설치 확정·판매는
+    // 고스트가 null/무효가 되므로 sync가 자동 무효화한다(설치 확정 칸은 다음 프레임 tower → 무효 고스트).
+    this.preview.sync(this.deps.grid, this.ghost);
   }
 
   // 거부 플래시 + 사유 토스트 페이드아웃(실시간 기준 — 타이머 감소만 여기서). Game이 프레임당 1회 호출.
@@ -234,15 +235,16 @@ export class Interaction {
     this.ghost = null;
     this.flash = null;
     this.hoverCell = null;
+    this.preview.clear();
     this.toast.reset();
     this.lastPanelSig = '';
     this.deps.buildMenu.setActiveTower(null);
     this.deps.buildMenu.showTowerPanel(null);
   }
 
-  // ── render(읽기 전용) ────────────────────────────────────────
-  // 호버/고스트 → 타워 → 거부 플래시 순으로, 그리기 순서는 Game.render가 조율한다.
+  // ── render(읽기 전용) — 그리기 순서는 Game.render가 조율한다. ──
   renderHoverOrGhost(ctx: CanvasRenderingContext2D): void {
+    this.preview.render(ctx); // 예상 경로(회색 반투명 도로)는 고스트/호버 타일 아래에 깐다.
     if (this.ghost) this.renderGhost(ctx, this.ghost);
     else this.renderHover(ctx);
   }
