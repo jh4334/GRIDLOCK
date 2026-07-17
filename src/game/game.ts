@@ -2,10 +2,8 @@
 // 설치/판매/선택/호버/고스트/거부 플래시 상호작용은 game/interaction.ts로 분리했고(M5),
 // Game이 소유·조율한다.
 
-import { GameLoop } from '../core/loop';
 import { MouseInput, Keyboard } from '../core/input';
 import { FpsCounter } from '../debug/fps';
-import { renderFlowField } from '../debug/flowField';
 import { DebugSpawner } from '../debug/spawnKeys';
 import { Grid } from './grid';
 import { Economy } from './economy';
@@ -22,22 +20,26 @@ import towersData from '../data/towers.json';
 import { Hud } from '../ui/hud';
 import { BuildMenu } from '../ui/buildMenu';
 import { Controls } from '../ui/controls';
-import { renderOverlay } from '../ui/overlay';
 import { WaveManager } from './waves';
-import { DebugCheats, renderHitboxes } from '../debug/cheats';
+import { DebugCheats } from '../debug/cheats';
 import { Interaction } from './interaction';
 import { UnitSelection } from './unitSelection';
 import { bindGameInput } from './gameInput';
-import { renderTitle } from '../ui/title';
 import { GameFlow } from './flow';
+import { renderDefense } from './gameRender';
+import type { BestRecord } from '../core/storage';
 
 // 배속 옵션(구조 상수 — 서브스텝 반복 횟수). 밸런스 수치 아님.
 const SPEEDS = [1, 2, 3];
 
+// App(모드 조율자)이 주입하는 콜백 — 타이틀 복귀 시 App이 디펜스 모드를 정리한다.
+export interface GameDeps {
+  onExit: () => void; // '타이틀로' 클릭 시 App이 deactivate 후 타이틀을 그린다.
+}
+
 export class Game {
   private readonly ctx: CanvasRenderingContext2D;
   private readonly canvas: HTMLCanvasElement;
-
   private readonly fps = new FpsCounter();
   private readonly input: MouseInput;
   private readonly keyboard = new Keyboard();
@@ -63,8 +65,13 @@ export class Game {
   private showFlowDebug = false;
   private showHitbox = false; // H 치트로 토글하는 히트박스 오버레이.
   private lastGold: number; // 골드 변동 감지용(변할 때만 메뉴 갱신).
+  private active = false; // App이 디펜스 모드를 활성화했을 때만 입력·update 처리.
 
-  constructor(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D) {
+  constructor(
+    canvas: HTMLCanvasElement,
+    ctx: CanvasRenderingContext2D,
+    private deps: GameDeps,
+  ) {
     this.canvas = canvas;
     this.ctx = ctx;
     this.input = new MouseInput(canvas);
@@ -98,7 +105,7 @@ export class Game {
       onNextWave: () => this.startNextWave(),
       onSetSpeed: (s) => this.setSpeed(s),
       onRestart: () => this.flow.restart(),
-      onToTitle: () => this.flow.toMenu(),
+      onToTitle: () => this.deps.onExit(), // 타이틀 복귀는 App이 정리(deactivate)한다.
     });
     this.controls.setActiveSpeed(this.speed);
 
@@ -167,11 +174,25 @@ export class Game {
       unitSelection: this.unitSelection,
       audio: this.audio,
       toggleFlowDebug: () => (this.showFlowDebug = !this.showFlowDebug),
+      isActive: () => this.active, // 비활성(타이틀·정복 모드) 시 디펜스 입력 무시.
     });
   }
 
-  start(): void {
-    new GameLoop({ update: (dt) => this.update(dt), render: () => this.render() }).start();
+  /** 최고기록(타이틀 화면 표시용) — App이 읽는다. */
+  get best(): BestRecord | null {
+    return this.flow.best;
+  }
+
+  /** 정복→디펜스 진입 — 월드 초기화 + 게임 시작(menu→playing). App이 호출. */
+  activate(): void {
+    this.flow.startGame();
+    this.active = true;
+  }
+
+  /** 타이틀 복귀 — 월드 초기화(flow.toMenu) + 게임 UI 숨김. App이 호출. */
+  deactivate(): void {
+    this.active = false;
+    this.flow.toMenu();
   }
 
   // 필드 재계산 후 살아있는 적 전원 재경로(DESIGN.md 함정 리스트 5번).
@@ -200,7 +221,8 @@ export class Game {
 
   // ── update / render ─────────────────────────────────────────
   // FPS·입력·플래시는 프레임당 1회, 게임 월드 갱신은 배속만큼 반복(dt를 키우지 않고 N회 호출).
-  private update(dt: number): void {
+  // App(루프 소유)이 디펜스 활성 프레임에만 호출한다.
+  update(dt: number): void {
     this.audio.resetFrame(); // 프레임당 발사/명중음 스로틀 카운터 리셋.
     this.fps.update(dt);
     this.interaction.updateHover(this.input);
@@ -255,45 +277,24 @@ export class Game {
     this.controls.showRestart(state === 'won' || state === 'lost'); // menu는 바 자체가 숨김.
   }
 
-  private render(): void {
-    const ctx = this.ctx;
-    ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-
-    // menu — 게임 월드 대신 타이틀 화면만 그린다.
-    if (this.flow.state === 'menu') {
-      renderTitle(ctx, this.flow.best);
-      return;
-    }
-
-    // 화면흔들림 — 캔버스 전체를 오프셋(계산은 update, 여기선 적용만). translate는 clear 이후.
-    ctx.save();
-    if (this.shake.active) ctx.translate(this.shake.x, this.shake.y);
-
-    // 그리드(정적) → 플로우 디버그 → 호버/고스트 → 타워 → 거부 플래시 → 적 → 전투(투사체·폭발) → 이펙트 → HUD → FPS.
-    this.grid.render(ctx);
-    if (this.showFlowDebug) renderFlowField(ctx, this.flowField);
-
-    this.interaction.renderHoverOrGhost(ctx);
-    this.interaction.renderTowers(ctx);
-    this.interaction.renderFlash(ctx);
-
-    for (const e of this.enemies) e.render(ctx);
-    this.unitSelection.renderRings(ctx); // 선택 링은 병사 아래에 깔리도록 먼저 그린다(M11).
-    this.interaction.renderUnits(ctx); // 병사·집결지 마커는 적 위에 그린다(M10).
-    this.combat.render(ctx); // 투사체·폭발은 적 위에 그린다.
-    this.effects.render(ctx); // 데미지 숫자·처치 파티클은 최상단.
-    this.unitSelection.renderDragBox(ctx); // 드래그 선택 박스는 최상단 UI 레이어(M11).
-
-    if (this.showHitbox) renderHitboxes(ctx, this.enemies, this.interaction.towers); // H 치트.
-
-    this.hud.render(ctx, this.economy, {
-      current: this.waveManager.current,
-      total: this.waveManager.total,
+  render(): void {
+    renderDefense(this.ctx, {
+      canvas: this.canvas,
+      shake: this.shake,
+      grid: this.grid,
+      showFlowDebug: this.showFlowDebug,
+      flowField: this.flowField,
+      interaction: this.interaction,
+      enemies: this.enemies,
+      unitSelection: this.unitSelection,
+      combat: this.combat,
+      effects: this.effects,
+      showHitbox: this.showHitbox,
+      hud: this.hud,
+      economy: this.economy,
+      waveManager: this.waveManager,
+      flow: this.flow,
+      fps: this.fps,
     });
-    // 승리/패배 오버레이는 HUD 위, FPS 아래로 그린다.
-    renderOverlay(ctx, this.flow.state, this.waveManager.current, this.waveManager.total, this.flow.best);
-    this.fps.render(ctx);
-
-    ctx.restore();
   }
 }

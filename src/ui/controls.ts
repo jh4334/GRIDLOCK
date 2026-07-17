@@ -4,29 +4,35 @@
 
 export interface ControlsConfig {
   speeds: number[]; // 예: [1, 2, 3]
-  onNextWave: () => void;
   onSetSpeed: (speed: number) => void;
-  onRestart: () => void;
-  onToTitle: () => void; // 승/패 후 타이틀 화면으로 복귀.
+  onToTitle: () => void; // 승/패 후(또는 정복 모드에서) 타이틀 화면으로 복귀.
+  onNextWave?: () => void; // 디펜스 전용 — 정복 모드에선 버튼을 만들지 않는다.
+  onRestart?: () => void; // 디펜스 전용.
+  rootId?: string; // 컨트롤 바 컨테이너 id(기본 'controls'). 정복은 별도 컨테이너 사용.
+  showNextWave?: boolean; // 다음 웨이브 버튼 생성 여부(기본 true).
 }
 
 export class Controls {
   private readonly root: HTMLElement;
-  private readonly nextBtn: HTMLButtonElement;
+  private readonly nextBtn: HTMLButtonElement | null = null;
   private readonly speedBtns = new Map<number, HTMLButtonElement>();
   private readonly restartBtn: HTMLButtonElement;
   private readonly toTitleBtn: HTMLButtonElement;
 
   constructor(config: ControlsConfig) {
-    const root = document.getElementById('controls');
-    if (!root) throw new Error('#controls 컨테이너를 찾을 수 없습니다.');
+    const rootId = config.rootId ?? 'controls';
+    const root = document.getElementById(rootId);
+    if (!root) throw new Error(`#${rootId} 컨테이너를 찾을 수 없습니다.`);
     this.root = root;
 
-    this.nextBtn = document.createElement('button');
-    this.nextBtn.className = 'next-wave-btn';
-    this.nextBtn.textContent = '다음 웨이브';
-    this.nextBtn.addEventListener('click', () => config.onNextWave());
-    root.appendChild(this.nextBtn);
+    if (config.showNextWave !== false) {
+      const nextBtn = document.createElement('button');
+      nextBtn.className = 'next-wave-btn';
+      nextBtn.textContent = '다음 웨이브';
+      nextBtn.addEventListener('click', () => config.onNextWave?.());
+      root.appendChild(nextBtn);
+      this.nextBtn = nextBtn;
+    }
 
     const speedGroup = document.createElement('div');
     speedGroup.className = 'speed-group';
@@ -43,7 +49,7 @@ export class Controls {
     this.restartBtn = document.createElement('button');
     this.restartBtn.className = 'restart-btn';
     this.restartBtn.textContent = '다시 시작';
-    this.restartBtn.addEventListener('click', () => config.onRestart());
+    this.restartBtn.addEventListener('click', () => config.onRestart?.());
     this.restartBtn.style.display = 'none';
     root.appendChild(this.restartBtn);
 
@@ -55,9 +61,9 @@ export class Controls {
     root.appendChild(this.toTitleBtn);
   }
 
-  /** 다음 웨이브 버튼 활성/비활성(대기 중에만 활성). */
+  /** 다음 웨이브 버튼 활성/비활성(대기 중에만 활성). 정복 모드엔 버튼이 없어 무시. */
   setNextWaveEnabled(enabled: boolean): void {
-    this.nextBtn.disabled = !enabled;
+    if (this.nextBtn) this.nextBtn.disabled = !enabled;
   }
 
   /** 현재 배속 버튼만 하이라이트. */
@@ -65,9 +71,14 @@ export class Controls {
     for (const [s, btn] of this.speedBtns) btn.classList.toggle('active', s === speed);
   }
 
-  /** 승리/패배 시 다시 시작 + 타이틀로 버튼 노출. */
+  /** 승리/패배 시 다시 시작 + 타이틀로 버튼 노출(디펜스). */
   showRestart(show: boolean): void {
     this.restartBtn.style.display = show ? '' : 'none';
+    this.toTitleBtn.style.display = show ? '' : 'none';
+  }
+
+  /** 타이틀로 버튼만 표시 — 정복 모드는 다시 시작 없이 항상 노출한다. */
+  setToTitleVisible(show: boolean): void {
     this.toTitleBtn.style.display = show ? '' : 'none';
   }
 

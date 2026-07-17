@@ -23,7 +23,8 @@
         background: #24242c;
         image-rendering: pixelated;
       }
-      #controls {
+      #controls,
+      #conquest-controls {
         margin-top: 12px;
         display: flex;
         align-items: center;
@@ -99,7 +100,8 @@
       .to-title-btn:hover {
         background: #363642;
       }
-      #build-menu {
+      #build-menu,
+      #conquest-menu {
         margin-top: 12px;
         display: flex;
         flex-direction: column;
@@ -214,7 +216,9 @@
     <div id="app">
       <canvas id="game-canvas" width="960" height="672"></canvas>
       <div id="controls"></div>
+      <div id="conquest-controls"></div>
       <div id="build-menu"></div>
+      <div id="conquest-menu"></div>
     </div>
     <script type="module" src="/src/main.ts"></script>
   </body>

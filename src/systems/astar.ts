@@ -5,8 +5,17 @@
 // 벽(타워) 칸은 통과 불가. 시작 칸은 벽 위여도 허용(배럭 칸에서 막 나온 병사도 탈출 가능).
 // 반환 경로는 시작 칸을 제외한 웨이포인트 목록(도착 칸 포함). 시작=도착이면 빈 배열.
 
-import type { Grid } from '../game/grid';
 import type { Cell } from './pathfinding';
+
+// A*가 필요로 하는 그리드의 최소 인터페이스 — 벽/범위 판정과 크기만 있으면 된다.
+// 디펜스 Grid와 정복 ConquestGrid(private 필드가 달라 클래스 구조 호환이 안 됨)를 함께
+// 받기 위한 구조적 계약. 둘 다 이 네 멤버를 공개로 갖는다.
+export interface PathGrid {
+  readonly cols: number;
+  readonly rows: number;
+  inBounds(cx: number, cy: number): boolean;
+  isWalkable(cx: number, cy: number): boolean;
+}
 
 // 상, 하, 좌, 우(대각선 없음 — 미로 통로가 직교라 4방향으로 충분).
 const DIRS: ReadonlyArray<readonly [number, number]> = [
@@ -76,7 +85,7 @@ class MinHeap {
  *   - from=to면 빈 배열([]) — 이미 도착.
  *   - 반환은 시작 칸을 뺀 웨이포인트 순서(도착 칸이 마지막).
  */
-export function findPath(grid: Grid, from: Cell, to: Cell): Cell[] | null {
+export function findPath(grid: PathGrid, from: Cell, to: Cell): Cell[] | null {
   if (!grid.inBounds(to.cx, to.cy) || !grid.isWalkable(to.cx, to.cy)) return null;
   if (!grid.inBounds(from.cx, from.cy)) return null;
   if (from.cx === to.cx && from.cy === to.cy) return [];

@@ -1,5 +1,5 @@
-// 타이틀 화면(M9) — 캔버스에 로고/부제/조작 안내/최고기록/시작 안내를 그린다.
-// 상태 변경 없는 순수 렌더. 시작 입력(클릭/Space)은 Game이 받아 상태를 전환한다.
+// 타이틀 화면 — 로고/부제/최고기록 + 모드 선택 버튼 두 개([디펜스 모드] [정복 모드]).
+// 상태 변경 없는 순수 렌더. 버튼 클릭 판정(hitTitleButton)은 App이 받아 모드를 전환한다.
 // 최고기록 문자열 포맷(formatBest)은 승/패 오버레이와 공유한다.
 
 import type { BestRecord } from '../core/storage';
@@ -7,10 +7,43 @@ import type { BestRecord } from '../core/storage';
 const COLOR_BG = '#1a1a1f';
 const COLOR_LOGO = '#9ad0ff';
 const COLOR_SUB = '#c8c8d0';
-const COLOR_GUIDE = '#a0a0aa';
-const COLOR_GUIDE_KEY = '#ffd166';
 const COLOR_BEST = '#7bd67b';
-const COLOR_START = '#e6f2ff';
+
+export type TitleMode = 'defense' | 'conquest';
+
+interface Rect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+const BTN_W = 240;
+const BTN_H = 64;
+const BTN_GAP = 40;
+
+// 두 모드 버튼의 사각형(렌더·클릭 판정 공유). 캔버스 크기에 맞춰 가운데 정렬.
+export function titleButtons(w: number, h: number): { defense: Rect; conquest: Rect } {
+  const totalW = BTN_W * 2 + BTN_GAP;
+  const startX = (w - totalW) / 2;
+  const y = h * 0.6 - BTN_H / 2;
+  return {
+    defense: { x: startX, y, w: BTN_W, h: BTN_H },
+    conquest: { x: startX + BTN_W + BTN_GAP, y, w: BTN_W, h: BTN_H },
+  };
+}
+
+/** 클릭 좌표가 어느 모드 버튼 위인지. 아니면 null. */
+export function hitTitleButton(w: number, h: number, px: number, py: number): TitleMode | null {
+  const b = titleButtons(w, h);
+  if (inside(b.defense, px, py)) return 'defense';
+  if (inside(b.conquest, px, py)) return 'conquest';
+  return null;
+}
+
+function inside(r: Rect, px: number, py: number): boolean {
+  return px >= r.x && px <= r.x + r.w && py >= r.y && py <= r.y + r.h;
+}
 
 /** 최고기록 한 줄 문자열. 없으면 안내 문구. (승/패 오버레이와 공유) */
 export function formatBest(best: BestRecord | null): string {
@@ -32,46 +65,49 @@ export function renderTitle(ctx: CanvasRenderingContext2D, best: BestRecord | nu
   // 로고
   ctx.fillStyle = COLOR_LOGO;
   ctx.font = 'bold 84px system-ui, sans-serif';
-  ctx.fillText('GRIDLOCK', w / 2, h * 0.24);
+  ctx.fillText('GRIDLOCK', w / 2, h * 0.22);
 
   // 부제
   ctx.fillStyle = COLOR_SUB;
   ctx.font = '22px system-ui, sans-serif';
-  ctx.fillText('미로형 타워 디펜스 — 20웨이브 생존', w / 2, h * 0.24 + 62);
+  ctx.fillText('미로형 타워 디펜스 · 미니 RTS', w / 2, h * 0.22 + 58);
 
-  // 조작 안내
-  ctx.font = '16px system-ui, sans-serif';
-  const guideTop = h * 0.46;
-  const lineGap = 30;
-  const rows = [
-    ['타워 설치', '하단 버튼 선택 후 칸 클릭'],
-    ['타워 선택', '설치된 타워 클릭'],
-    ['업그레이드 / 판매', 'U 키 / X 키'],
-    ['배속', 'x1 · x2 · x3 버튼'],
-    ['취소', 'Esc'],
-  ];
-  rows.forEach(([label, value], i) => {
-    const y = guideTop + i * lineGap;
-    ctx.textAlign = 'right';
-    ctx.fillStyle = COLOR_GUIDE_KEY;
-    ctx.fillText(label, w / 2 - 14, y);
-    ctx.textAlign = 'left';
-    ctx.fillStyle = COLOR_GUIDE;
-    ctx.fillText(value, w / 2 + 14, y);
-  });
+  // 모드 버튼
+  const b = titleButtons(w, h);
+  drawButton(ctx, b.defense, '디펜스 모드', '#2e5a7a', '#4080a8', '#e6f2ff', '20웨이브 생존');
+  drawButton(ctx, b.conquest, '정복 모드', '#7a4e2e', '#a87840', '#ffe9d6', '본진 정복 RTS');
 
-  // 최고기록
+  // 최고기록(디펜스 기준)
   ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
   ctx.fillStyle = COLOR_BEST;
   ctx.font = '18px monospace';
-  ctx.fillText(formatBest(best), w / 2, h * 0.82);
-
-  // 시작 안내 (은은한 깜빡임)
-  ctx.fillStyle = COLOR_START;
-  ctx.font = 'bold 24px system-ui, sans-serif';
-  const blink = 0.55 + 0.45 * Math.abs(Math.sin(performance.now() / 500));
-  ctx.globalAlpha = blink;
-  ctx.fillText('클릭 또는 Space 로 시작', w / 2, h * 0.9);
+  ctx.fillText(formatBest(best), w / 2, h * 0.86);
 
   ctx.restore();
+}
+
+function drawButton(
+  ctx: CanvasRenderingContext2D,
+  r: Rect,
+  label: string,
+  fill: string,
+  border: string,
+  text: string,
+  sub: string,
+): void {
+  ctx.fillStyle = fill;
+  ctx.fillRect(r.x, r.y, r.w, r.h);
+  ctx.strokeStyle = border;
+  ctx.lineWidth = 2;
+  ctx.strokeRect(r.x + 1, r.y + 1, r.w - 2, r.h - 2);
+
+  ctx.fillStyle = text;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = 'bold 24px system-ui, sans-serif';
+  ctx.fillText(label, r.x + r.w / 2, r.y + r.h / 2 - 8);
+  ctx.font = '13px system-ui, sans-serif';
+  ctx.fillStyle = 'rgba(255,255,255,0.7)';
+  ctx.fillText(sub, r.x + r.w / 2, r.y + r.h / 2 + 16);
 }

@@ -8,7 +8,7 @@
 // update(dt)/render(ctx) 분리 — 상태 변경은 melee/maintain에서, render는 읽기 전용.
 
 import { cellCenter } from '../game/grid';
-import type { Grid } from '../game/grid';
+import type { PathGrid } from '../systems/astar';
 import { Tower, UPGRADE } from './tower';
 import type { BarracksSpec } from './tower';
 import type { Enemy } from './enemy';
@@ -151,7 +151,7 @@ export class Barracks extends Tower {
   rallyX: number; // 집결지 중심(픽셀).
   rallyY: number;
 
-  constructor(cx: number, cy: number, grid: Grid) {
+  constructor(cx: number, cy: number, grid: PathGrid) {
     super('barracks', cx, cy);
     this.bspec = this.spec.barracks as BarracksSpec;
     const rally = this.defaultRally(cx, cy, grid);
@@ -178,7 +178,7 @@ export class Barracks extends Tower {
   }
 
   /** 기본 집결지 = 배럭 인접 통행 칸(기지 방향 우선). 없으면 배럭 칸 중심. */
-  private defaultRally(cx: number, cy: number, grid: Grid): { x: number; y: number } {
+  private defaultRally(cx: number, cy: number, grid: PathGrid): { x: number; y: number } {
     const cand: ReadonlyArray<readonly [number, number]> = [
       [1, 0],
       [0, -1],
