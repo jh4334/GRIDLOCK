@@ -59,9 +59,14 @@ export function bindGameInput(d: GameInputDeps): void {
     },
   });
 
-  // 우클릭 — 병사 선택이 있으면 A* 이동 명령, 없으면 배럭 집결지 지정(M10/M11).
+  // 우클릭 — 설치 모드면 설치 취소(D2.1), 아니면 병사 이동 명령, 그도 없으면 배럭 집결지 지정(M10/M11).
+  // 설치 모드 취소를 최우선으로 두어 기존 우클릭 동작(이동/집결지)은 설치 중이 아닐 때만 발동한다.
   input.onRightClick((x, y) => {
     if (!isActive() || flow.state !== 'playing') return;
+    if (interaction.isPlacing) {
+      interaction.handleEscape(); // 설치 모드일 때 handleEscape는 설치 모드만 해제(선택 유지).
+      return;
+    }
     if (unitSelection.hasSelection) unitSelection.commandMove(x, y);
     else interaction.handleRightClick(x, y);
   });

@@ -14,6 +14,7 @@ import { drawTower, type TowerVisualKind } from '../render/towerSprites';
 import { barracksList, barracksPanelSig, setRallyFromClick, renderUnits, createTower, towerPanelInfo, sellRefund } from './barracksInteraction';
 import { isCellPlaceable, isPathClear } from '../systems/placement';
 import type { BuildMenu } from '../ui/buildMenu';
+import { Toast, MSG_GOLD, MSG_BLOCKADE, MSG_OCCUPIED } from '../ui/toast';
 
 // 시각 상수(밸런스 아님).
 const COLOR_HOVER = 'rgba(255, 255, 255, 0.18)';
@@ -50,6 +51,7 @@ export class Interaction {
   private ghost: Ghost | null = null; // updateHover가 계산, render가 읽기만.
   private flash: Flash | null = null; // 봉쇄 거부 피드백.
   private hoverCell: { cx: number; cy: number } | null = null;
+  private readonly toast = new Toast(); // 설치 불가 사유 안내(D2.1). update가 타이머 관리, render는 읽기만.
 
   constructor(private deps: InteractionDeps) {}
 
@@ -167,11 +169,12 @@ export class Interaction {
     const { grid, economy } = this.deps;
     const enemies = this.deps.getEnemies();
     const spec = towerSpec(kind);
-    if (economy.gold < spec.cost) return; // 골드 부족(버튼도 비활성이라 보통 도달 안 함).
-    if (!isCellPlaceable(grid, enemies, cx, cy)) return; // 기본 조건 불가 → 무시.
+    if (economy.gold < spec.cost) { this.toast.show(MSG_GOLD); return; } // 보통 버튼 비활성으로 도달 안 함.
+    if (!isCellPlaceable(grid, enemies, cx, cy)) { this.toast.show(MSG_OCCUPIED); return; } // 점유/스폰/기지/중복.
     if (!isPathClear(grid, enemies, cx, cy)) {
-      // 봉쇄 → 설치 거부 + 붉은 플래시.
+      // 봉쇄 → 설치 거부 + 붉은 플래시 + 사유 토스트(병행).
       this.flash = { cx, cy, timer: REJECT_FLASH_TIME };
+      this.toast.show(MSG_BLOCKADE);
       return;
     }
 
@@ -214,12 +217,13 @@ export class Interaction {
     }
   }
 
-  // 거부 플래시 페이드아웃(실시간 기준 — 타이머 감소만 여기서).
+  // 거부 플래시 + 사유 토스트 페이드아웃(실시간 기준 — 타이머 감소만 여기서). Game이 프레임당 1회 호출.
   updateFlash(dt: number): void {
     if (this.flash) {
       this.flash.timer -= dt;
       if (this.flash.timer <= 0) this.flash = null;
     }
+    this.toast.update(dt);
   }
 
   // 재시작 — 타워·선택·설치 모드·피드백 상태를 모두 초기화한다.
@@ -230,6 +234,7 @@ export class Interaction {
     this.ghost = null;
     this.flash = null;
     this.hoverCell = null;
+    this.toast.reset();
     this.lastPanelSig = '';
     this.deps.buildMenu.setActiveTower(null);
     this.deps.buildMenu.showTowerPanel(null);
@@ -262,6 +267,11 @@ export class Interaction {
     ctx.fillStyle = COLOR_REJECT;
     ctx.fillRect(x, y, TILE, TILE);
     ctx.restore();
+  }
+
+  /** 설치 불가 사유 토스트(하단 중앙). HUD 위 레이어에 그린다 — Game.render가 조율. */
+  renderToast(ctx: CanvasRenderingContext2D): void {
+    this.toast.render(ctx);
   }
 
   private renderHover(ctx: CanvasRenderingContext2D): void {

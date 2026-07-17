@@ -112,11 +112,14 @@ async function defenseStage(page) {
 
   // 마지막 출구 (1,7) 설치 시도 — 설치 모드 유지 중이고 골드도 충분(≈120)하므로,
   // 거부된다면 순전히 봉쇄(경로 차단) 때문이다.
+  // placeAt의 마지막 대기(150ms)가 거부 직후 0.3초 내이므로, 이 스크린샷에 사유 토스트(봉쇄)가 함께 담긴다.
   await placeAt(1, 7);
   await page.screenshot({ path: join(OUT, '02-blockade-reject.png') });
 
-  // 판정: 설치 모드를 풀고 (1,7)을 클릭 — 타워가 없으니 정보 패널이 뜨지 않아야 한다.
-  await page.keyboard.press('Escape');
+  // 판정: 우클릭으로 설치 모드를 취소(D2.1 — 기존 흐름 내 1회 수행, 회귀 방지)한 뒤 (1,7)을 클릭 —
+  // 타워가 없으니 정보 패널이 뜨지 않아야 한다.
+  await page.mouse.click(...cell(1, 7), { button: 'right' });
+  await page.waitForTimeout(100);
   await page.mouse.click(...cell(1, 7));
   await page.waitForTimeout(150);
   check(!(await vis(page, '.tower-panel').isVisible().catch(() => false)), '봉쇄 칸(1,7)에 타워가 설치됨(거부 실패)');
