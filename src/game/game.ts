@@ -10,8 +10,9 @@ import { DebugSpawner } from '../debug/spawnKeys';
 import { Grid } from './grid';
 import { Economy } from './economy';
 import { computeFlowField, FlowField } from '../systems/pathfinding';
-import { CombatSystem } from '../systems/combat';
-import { MeleeSystem } from '../systems/melee';
+import type { CombatSystem } from '../systems/combat';
+import type { MeleeSystem } from '../systems/melee';
+import { createBattleSystems } from './battleSystems';
 import { EffectsSystem } from '../systems/effects';
 import { AudioEngine } from '../core/audio';
 import { ScreenShake } from './screenShake';
@@ -73,33 +74,10 @@ export class Game {
       this.enemies.push(createEnemy(kind, this.flowField));
     });
 
-    // 전투 이펙트/사운드/화면흔들림은 combat 훅으로 배선(combat은 좌표만 넘김).
-    this.combat = new CombatSystem({
-      onFire: (kind) => this.audio.fire(kind),
-      onDamage: (x, y, amount) => {
-        this.effects.spawnDamage(x, y, amount);
-        this.audio.hit();
-      },
-      onKill: (x, y, color) => {
-        this.effects.spawnKill(x, y, color);
-        this.audio.kill();
-      },
-      onCannonHit: () => {
-        this.shake.trigger();
-        this.audio.boom();
-      },
-    });
-
-    // 근접 전투(병사↔적) — 처치·사망 이펙트를 combat과 같은 훅 방식으로 배선(M10).
-    this.melee = new MeleeSystem({
-      onEnemyKilled: (x, y, color) => {
-        this.effects.spawnKill(x, y, color);
-        this.audio.kill();
-      },
-      onSoldierKilled: (x, y, color) => {
-        this.effects.spawnKill(x, y, color); // 병사는 시체 없이 파티클만.
-      },
-    });
+    // 전투(투사체)·근접(병사) 시스템 생성 + 이펙트/사운드/화면흔들림 배선은 battleSystems로 분리.
+    const battle = createBattleSystems({ effects: this.effects, audio: this.audio, shake: this.shake });
+    this.combat = battle.combat;
+    this.melee = battle.melee;
 
     // 웨이브 스포너 — 스폰 시점의 flowField를 클로저로 주입(설치/판매로 바뀌어도 최신값 사용).
     this.waveManager = new WaveManager({
@@ -246,8 +224,7 @@ export class Game {
     if (this.flow.state !== 'playing') return; // 서브스텝 중 승/패 전환 시 잔여 스텝 중단.
     this.spawner.update(dt);
 
-    // 근접 전투는 적 이동보다 먼저 — 블로킹(enemy.blocked)을 이번 프레임에 세운 뒤,
-    // 이어지는 적 update가 그 플래그를 보고 이동을 건너뛴다(교전 중 적 정지).
+    // 근접 전투는 적 이동보다 먼저 — 블로킹(enemy.blocked)을 세운 뒤 적 update가 이동을 건너뛴다.
     this.melee.update(dt, this.interaction.barracks, this.enemies, this.economy);
     for (const e of this.enemies) e.update(dt, this.flowField);
     // 전투(타겟팅·발사·명중·데미지·처치 골드)는 combat 시스템이 담당.
