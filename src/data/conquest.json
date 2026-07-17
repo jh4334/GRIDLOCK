@@ -81,8 +81,7 @@
     "depot": {
       "cost": 75,
       "buildTime": 3,
-      "hp": 200,
-      "popBonus": 4
+      "hp": 200
     },
     "factory": {
       "cost": 200,

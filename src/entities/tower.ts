@@ -80,9 +80,6 @@ export function towerSpec(kind: TowerKind): TowerSpec {
   return towersData.towers[kind] as TowerSpec;
 }
 
-// 칸 안쪽 여백(시각 상수) — 고스트 미리보기와 설치 후 모습의 여백을 맞추는 데만 쓴다.
-export const TOWER_INSET = 4;
-
 export class Tower {
   readonly kind: TowerKind;
   readonly spec: TowerSpec;
