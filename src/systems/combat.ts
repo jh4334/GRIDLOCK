@@ -58,7 +58,8 @@ export class CombatSystem {
       if (t.cooldown > 0) continue;
 
       const center = cellCenter(t.cx, t.cy);
-      const target = this.pickTarget(center.x, center.y, t.spec.range, enemies, field);
+      // 사거리·공격력·슬로우 지속은 레벨 반영 실효 스탯 사용(M7 업그레이드).
+      const target = this.pickTarget(center.x, center.y, t.effectiveRange, enemies, field);
       if (!target) continue;
 
       this.projectiles.push(
@@ -69,10 +70,10 @@ export class CombatSystem {
           radius: t.spec.projectileRadius,
           color: t.spec.projectileColor,
           target,
-          damage: t.spec.damage,
+          damage: t.effectiveDamage,
           splashRadius: t.spec.splashRadius ?? 0,
           slowFactor: t.spec.slowFactor ?? 0,
-          slowDuration: t.spec.slowDuration ?? 0,
+          slowDuration: t.effectiveSlowDuration,
         }),
       );
       t.cooldown = 1 / t.spec.fireRate; // fireRate 회/s → 1/fireRate 초 간격.

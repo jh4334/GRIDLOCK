@@ -39,7 +39,7 @@ export function renderHitboxes(ctx: CanvasRenderingContext2D, enemies: Enemy[], 
   for (const t of towers) {
     const c = cellCenter(t.cx, t.cy);
     ctx.beginPath();
-    ctx.arc(c.x, c.y, t.spec.range, 0, Math.PI * 2);
+    ctx.arc(c.x, c.y, t.effectiveRange, 0, Math.PI * 2);
     ctx.stroke();
   }
 

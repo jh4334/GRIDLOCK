@@ -133,8 +133,54 @@
       .tower-btn.unaffordable .t-cost {
         color: #7a6a3a;
       }
-      .sell-slot {
-        min-height: 36px;
+      .tower-panel-slot {
+        min-height: 92px;
+        display: flex;
+        justify-content: center;
+      }
+      .tower-panel {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 16px;
+        background: #24242c;
+        border: 2px solid #3a3a46;
+        border-radius: 8px;
+      }
+      .tp-title {
+        font-size: 15px;
+        font-weight: 600;
+        color: #ffe066;
+      }
+      .tp-stats {
+        display: flex;
+        gap: 14px;
+        font-size: 13px;
+        color: #c8c8d0;
+      }
+      .tp-actions {
+        display: flex;
+        gap: 10px;
+      }
+      .upgrade-btn {
+        padding: 8px 16px;
+        background: #2e6a3a;
+        color: #e0ffe6;
+        border: 2px solid #3f9450;
+        border-radius: 6px;
+        font-family: inherit;
+        font-size: 14px;
+        cursor: pointer;
+      }
+      .upgrade-btn:hover:not(:disabled) {
+        background: #338044;
+      }
+      .upgrade-btn:disabled {
+        color: #6a6a72;
+        background: #24242a;
+        border-color: #3a3a46;
+        cursor: not-allowed;
       }
       .sell-btn {
         padding: 8px 16px;

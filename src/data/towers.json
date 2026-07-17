@@ -1,38 +1,58 @@
 {
-  "arrow": {
-    "name": "애로우",
-    "cost": 50,
-    "range": 120,
-    "fireRate": 1.0,
-    "damage": 12,
-    "color": "#5fb85f",
-    "projectileSpeed": 400,
-    "projectileRadius": 4,
-    "projectileColor": "#e9f5a0"
+  "towers": {
+    "arrow": {
+      "name": "애로우",
+      "cost": 50,
+      "range": 120,
+      "fireRate": 1.0,
+      "damage": 12,
+      "color": "#5fb85f",
+      "projectileSpeed": 400,
+      "projectileRadius": 4,
+      "projectileColor": "#e9f5a0"
+    },
+    "cannon": {
+      "name": "캐논",
+      "cost": 90,
+      "range": 100,
+      "fireRate": 0.5,
+      "damage": 25,
+      "splashRadius": 40,
+      "color": "#c8623a",
+      "projectileSpeed": 300,
+      "projectileRadius": 6,
+      "projectileColor": "#f0a45a"
+    },
+    "frost": {
+      "name": "프로스트",
+      "cost": 70,
+      "range": 110,
+      "fireRate": 0.8,
+      "damage": 5,
+      "slowFactor": 0.4,
+      "slowDuration": 2,
+      "color": "#4fb0d6",
+      "projectileSpeed": 240,
+      "projectileRadius": 5,
+      "projectileColor": "#bfe8f7"
+    },
+    "sniper": {
+      "name": "스나이퍼",
+      "cost": 140,
+      "range": 280,
+      "fireRate": 0.33,
+      "damage": 80,
+      "color": "#9b4fd6",
+      "projectileSpeed": 650,
+      "projectileRadius": 4,
+      "projectileColor": "#e18cff"
+    }
   },
-  "cannon": {
-    "name": "캐논",
-    "cost": 90,
-    "range": 100,
-    "fireRate": 0.5,
-    "damage": 25,
-    "splashRadius": 40,
-    "color": "#c8623a",
-    "projectileSpeed": 300,
-    "projectileRadius": 6,
-    "projectileColor": "#f0a45a"
-  },
-  "frost": {
-    "name": "프로스트",
-    "cost": 70,
-    "range": 110,
-    "fireRate": 0.8,
-    "damage": 5,
-    "slowFactor": 0.4,
-    "slowDuration": 2,
-    "color": "#4fb0d6",
-    "projectileSpeed": 240,
-    "projectileRadius": 5,
-    "projectileColor": "#bfe8f7"
+  "upgrade": {
+    "maxLevel": 3,
+    "costFactors": [0.8, 1.2],
+    "damageMult": 1.4,
+    "rangeMult": 1.1,
+    "slowDurationMult": 1.2
   }
 }

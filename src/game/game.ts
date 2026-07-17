@@ -117,12 +117,13 @@ export class Game {
     });
 
     this.buildMenu = new BuildMenu({
-      towers: (Object.keys(towersData) as TowerKind[]).map((kind) => ({
+      towers: (Object.keys(towersData.towers) as TowerKind[]).map((kind) => ({
         kind,
         name: towerSpec(kind).name,
         cost: towerSpec(kind).cost,
       })),
       onSelectTower: (kind) => this.interaction.toggleTower(kind),
+      onUpgrade: () => this.interaction.upgradeSelected(),
       onSell: () => this.interaction.sellSelected(),
     });
     this.buildMenu.updateAffordability(this.economy.gold);
@@ -141,6 +142,7 @@ export class Game {
       this.showFlowDebug = !this.showFlowDebug;
     });
     this.keyboard.on('escape', () => this.interaction.handleEscape());
+    this.keyboard.on('u', () => this.interaction.upgradeSelected()); // 선택 타워 업그레이드.
     this.keyboard.on('x', () => this.interaction.sellSelected());
     this.keyboard.on('m', () => this.audio.toggleMute()); // 음소거 토글.
     this.keyboard.on('r', () => this.restart()); // 승리/패배 후 다시 시작.
@@ -242,6 +244,7 @@ export class Game {
     if (this.economy.gold !== this.lastGold) {
       this.lastGold = this.economy.gold;
       this.buildMenu.updateAffordability(this.economy.gold);
+      this.interaction.refreshPanel(); // 골드 변동 → 업그레이드 버튼 활성 여부 갱신.
     }
     // 다음 웨이브 버튼은 진행 중 + 대기 상태 + 남은 웨이브가 있을 때만 활성.
     this.controls.setNextWaveEnabled(this.state === 'playing' && this.waveManager.canStart);

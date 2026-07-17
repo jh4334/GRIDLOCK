@@ -80,17 +80,54 @@ export class Interaction {
 
   private selectTower(t: Tower): void {
     this.selectedTower = t;
-    this.deps.buildMenu.showSell(this.refundOf(t));
+    this.showPanel();
   }
 
   private deselect(): void {
     if (!this.selectedTower) return;
     this.selectedTower = null;
-    this.deps.buildMenu.showSell(null);
+    this.deps.buildMenu.showTowerPanel(null);
   }
 
   private refundOf(t: Tower): number {
     return Math.round(t.invested * economyData.sellRefundRate);
+  }
+
+  // 선택된 타워의 정보 패널을 현재 스탯·골드로 다시 그린다(선택/업그레이드/골드 변동 시).
+  private showPanel(): void {
+    const t = this.selectedTower;
+    if (!t) {
+      this.deps.buildMenu.showTowerPanel(null);
+      return;
+    }
+    const cost = t.upgradeCost;
+    this.deps.buildMenu.showTowerPanel({
+      name: t.spec.name,
+      level: t.level,
+      maxLevel: t.maxLevel,
+      damage: Math.round(t.effectiveDamage * 10) / 10, // 소수 1자리.
+      range: Math.round(t.effectiveRange),
+      fireRate: t.spec.fireRate,
+      upgradeCost: cost,
+      canAffordUpgrade: cost !== null && this.deps.economy.gold >= cost,
+      refund: this.refundOf(t),
+    });
+  }
+
+  /** 골드 변동 시 Game이 호출 — 선택 중이면 업그레이드 버튼 활성 여부를 다시 반영한다. */
+  refreshPanel(): void {
+    if (this.selectedTower) this.showPanel();
+  }
+
+  /** 선택된 타워를 한 단계 업그레이드(골드 충분 + 최대 레벨 미만일 때만). */
+  upgradeSelected(): void {
+    const t = this.selectedTower;
+    if (!t) return;
+    const cost = t.upgradeCost;
+    if (cost === null || this.deps.economy.gold < cost) return;
+    this.deps.economy.spend(cost);
+    t.upgrade(); // level++, invested += cost.
+    this.showPanel();
   }
 
   // ── 클릭 처리 ────────────────────────────────────────────────
@@ -179,7 +216,7 @@ export class Interaction {
     this.flash = null;
     this.hoverCell = null;
     this.deps.buildMenu.setActiveTower(null);
-    this.deps.buildMenu.showSell(null);
+    this.deps.buildMenu.showTowerPanel(null);
   }
 
   // ── render(읽기 전용) ────────────────────────────────────────
@@ -191,6 +228,8 @@ export class Interaction {
 
   renderTowers(ctx: CanvasRenderingContext2D): void {
     for (const t of this.towers) t.render(ctx, t === this.selectedTower);
+    // 선택된 타워의 실효 사거리 원은 타워 위에 덧그린다.
+    if (this.selectedTower) this.selectedTower.renderRange(ctx);
   }
 
   renderFlash(ctx: CanvasRenderingContext2D): void {

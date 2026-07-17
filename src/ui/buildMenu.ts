@@ -1,6 +1,9 @@
-// 캔버스 아래 HTML 빌드 메뉴 — 타워 버튼(이름+비용) + 선택 시 판매 버튼.
+// 캔버스 아래 HTML 빌드 메뉴 — 타워 버튼(이름+비용) + 선택 시 타워 정보 패널.
 // 캔버스 밖 UI는 DOM으로 처리한다(DESIGN.md). 설치 모드·선택 상태는 Game이 소유하고,
-// 이 메뉴는 클릭을 콜백으로 알리고 표시(하이라이트/비활성/판매 버튼)만 갱신한다.
+// 이 메뉴는 클릭을 콜백으로 알리고 표시(하이라이트/비활성/정보 패널)만 갱신한다.
+//
+// 정보 패널(M7): 이름+레벨, 공격력/사거리/공속, 업그레이드 버튼(최대 레벨/골드 부족 처리),
+// 판매 버튼. 상태(스탯·비용·가격 여유)는 Game/Interaction이 계산해 넘겨준다.
 
 import type { TowerKind } from '../entities/tower';
 
@@ -10,19 +13,35 @@ interface TowerButtonInfo {
   cost: number;
 }
 
+// 선택된 타워의 정보 패널에 표시할 값(전부 계산 완료 상태로 전달받는다).
+export interface TowerPanelInfo {
+  name: string;
+  level: number;
+  maxLevel: number;
+  damage: number;
+  range: number;
+  fireRate: number;
+  upgradeCost: number | null; // null = 최대 레벨(업그레이드 버튼 비활성 + "최대 레벨").
+  canAffordUpgrade: boolean; // 골드 충분 여부(업그레이드 버튼 활성 조건).
+  refund: number; // 판매 시 환급 골드.
+}
+
 interface BuildMenuConfig {
   towers: TowerButtonInfo[];
   onSelectTower: (kind: TowerKind) => void;
+  onUpgrade: () => void;
   onSell: () => void;
 }
 
 export class BuildMenu {
   private readonly buttons = new Map<TowerKind, HTMLButtonElement>();
   private readonly costs = new Map<TowerKind, number>();
-  private readonly sellSlot: HTMLDivElement;
+  private readonly panelSlot: HTMLDivElement;
+  private readonly onUpgrade: () => void;
   private readonly onSell: () => void;
 
   constructor(config: BuildMenuConfig) {
+    this.onUpgrade = config.onUpgrade;
     this.onSell = config.onSell;
 
     const root = document.getElementById('build-menu');
@@ -42,10 +61,10 @@ export class BuildMenu {
     }
     root.appendChild(row);
 
-    // 판매 버튼 자리 — 선택 시에만 채워진다.
-    this.sellSlot = document.createElement('div');
-    this.sellSlot.className = 'sell-slot';
-    root.appendChild(this.sellSlot);
+    // 정보 패널 자리 — 타워 선택 시에만 채워진다.
+    this.panelSlot = document.createElement('div');
+    this.panelSlot.className = 'tower-panel-slot';
+    root.appendChild(this.panelSlot);
   }
 
   /** 설치 모드 대상 버튼만 하이라이트. null이면 전부 해제. */
@@ -62,14 +81,49 @@ export class BuildMenu {
     }
   }
 
-  /** 선택된 타워의 판매 버튼 표시. null이면 숨김. */
-  showSell(refund: number | null): void {
-    this.sellSlot.replaceChildren();
-    if (refund === null) return;
-    const btn = document.createElement('button');
-    btn.className = 'sell-btn';
-    btn.textContent = `판매 (+${refund}G)`;
-    btn.addEventListener('click', () => this.onSell());
-    this.sellSlot.appendChild(btn);
+  /** 선택된 타워의 정보 패널 표시. null이면 숨김. */
+  showTowerPanel(info: TowerPanelInfo | null): void {
+    this.panelSlot.replaceChildren();
+    if (info === null) return;
+
+    const panel = document.createElement('div');
+    panel.className = 'tower-panel';
+
+    const title = document.createElement('div');
+    title.className = 'tp-title';
+    title.textContent = `${info.name}  Lv.${info.level}/${info.maxLevel}`;
+    panel.appendChild(title);
+
+    const stats = document.createElement('div');
+    stats.className = 'tp-stats';
+    stats.innerHTML =
+      `<span>공격력 ${info.damage}</span>` +
+      `<span>사거리 ${info.range}</span>` +
+      `<span>공속 ${info.fireRate}/s</span>`;
+    panel.appendChild(stats);
+
+    const actions = document.createElement('div');
+    actions.className = 'tp-actions';
+
+    const upBtn = document.createElement('button');
+    upBtn.className = 'upgrade-btn';
+    if (info.upgradeCost === null) {
+      upBtn.textContent = '최대 레벨';
+      upBtn.disabled = true;
+    } else {
+      upBtn.textContent = `업그레이드 (${info.upgradeCost}G)`;
+      upBtn.disabled = !info.canAffordUpgrade;
+      upBtn.addEventListener('click', () => this.onUpgrade());
+    }
+    actions.appendChild(upBtn);
+
+    const sellBtn = document.createElement('button');
+    sellBtn.className = 'sell-btn';
+    sellBtn.textContent = `판매 (+${info.refund}G)`;
+    sellBtn.addEventListener('click', () => this.onSell());
+    actions.appendChild(sellBtn);
+
+    panel.appendChild(actions);
+    this.panelSlot.appendChild(panel);
   }
 }

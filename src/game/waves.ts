@@ -4,8 +4,9 @@
 //   ready  ──(startNextWave)──▶ inProgress ──(스폰 완료 + 필드의 적 0)──▶ ready
 //   웨이브 완료 시 onWaveClear(보너스) 지급, 마지막 웨이브(totalWaves)면 onVictory.
 //
-// 1~10웨이브는 waves.json에 수동 정의(조합의 재미), 11웨이브부터는 웨이브 번호만으로
-// 결정적으로 절차 생성한다(랜덤 없음 → 재현 가능). HP 스케일은 웨이브당 hpScalePerWave 배.
+// 1~20웨이브(= totalWaves)는 waves.json에 전부 수동 정의(조합의 재미). 절차 생성은
+// totalWaves를 넘어서는 경우에 대비한 결정적 폴백으로만 남겨 둔다(랜덤 없음 → 재현 가능).
+// HP 스케일은 웨이브당 hpScalePerWave 배.
 //
 // 밸런스 수치(조합/스케일/보너스)는 전부 data/*.json에서 읽는다(코드에 매직넘버 금지).
 
@@ -143,14 +144,15 @@ function buildSchedule(groups: SpawnGroup[]): SpawnEvent[] {
   return events;
 }
 
-// 웨이브 번호 → 스폰 그룹 배열. 1~10은 waves.json 수동 정의, 11~는 절차 생성.
+// 웨이브 번호 → 스폰 그룹 배열. 정의된 만큼(현재 1~20)은 waves.json 수동 정의,
+// 그 범위를 넘어서면 절차 생성으로 폴백한다(totalWaves=20이라 평소엔 도달하지 않음).
 function groupsForWave(n: number): SpawnGroup[] {
   const manual = wavesData.waves as unknown as SpawnGroup[][];
   if (n <= manual.length) return manual[n - 1];
   return proceduralWave(n);
 }
 
-// 11웨이브부터의 결정적 절차 생성(랜덤 없이 웨이브 번호로만 계산).
+// 폴백 절차 생성 — 수동 정의(waves.json)를 넘는 웨이브용. 결정적(랜덤 없이 웨이브 번호로만 계산).
 //   - grunt 기본 물량이 웨이브에 비례해 증가
 //   - 홀수 웨이브엔 runner, 짝수 웨이브엔 swarm
 //   - 3의 배수 웨이브엔 tanker
