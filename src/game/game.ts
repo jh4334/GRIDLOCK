@@ -78,9 +78,8 @@ export class Game {
     this.flowField = computeFlowField(this.grid);
     this.lastGold = this.economy.gold;
 
-    this.spawner = new DebugSpawner(this.keyboard, (kind) => {
-      this.enemies.push(createEnemy(kind, this.flowField));
-    });
+    // 세 번째 인자 isActive: 정복 모드·타이틀에서 숫자키 스폰이 새지 않도록 격리.
+    this.spawner = new DebugSpawner(this.keyboard, (kind) => this.enemies.push(createEnemy(kind, this.flowField)), () => this.active);
 
     // 전투(투사체)·근접(병사) 시스템 생성 + 이펙트/사운드/화면흔들림 배선은 battleSystems로 분리.
     const battle = createBattleSystems({ effects: this.effects, audio: this.audio, shake: this.shake });
@@ -109,13 +108,12 @@ export class Game {
     });
     this.controls.setActiveSpeed(this.speed);
 
-    new DebugCheats(this.keyboard, {
-      addGold: (n) => this.economy.addGold(n),
-      skipWave: () => this.skipWave(),
-      toggleHitboxes: () => {
-        this.showHitbox = !this.showHitbox;
-      },
-    });
+    // 세 번째 인자 isActive: 정복 모드·타이틀에서 G/N/H 치트가 새지 않도록 격리.
+    new DebugCheats(
+      this.keyboard,
+      { addGold: (n) => this.economy.addGold(n), skipWave: () => this.skipWave(), toggleHitboxes: () => (this.showHitbox = !this.showHitbox) },
+      () => this.active,
+    );
 
     this.buildMenu = new BuildMenu({
       towers: (Object.keys(towersData.towers) as TowerKind[]).map((kind) => ({

@@ -1,9 +1,15 @@
 {
   "startCrystal": 150,
   "hq": {
-    "hp": 1500,
-    "playerCell": [2, 11],
-    "enemyCell": [17, 2],
+    "hp": 900,
+    "playerCell": [
+      2,
+      11
+    ],
+    "enemyCell": [
+      17,
+      2
+    ],
     "workerCost": 50,
     "workerBuildTime": 4,
     "queueMax": 5
@@ -23,41 +29,130 @@
     "harvestTime": 2
   },
   "crystal": {
-    "amount": 300,
-    "playerCells": [[4, 9], [5, 9], [4, 10], [5, 10]],
-    "enemyCells": [[14, 3], [15, 3], [14, 4], [15, 4]],
-    "centerCells": [[9, 6], [10, 7]]
+    "amount": 400,
+    "playerCells": [
+      [
+        4,
+        9
+      ],
+      [
+        5,
+        9
+      ],
+      [
+        4,
+        10
+      ],
+      [
+        5,
+        10
+      ]
+    ],
+    "enemyCells": [
+      [
+        14,
+        3
+      ],
+      [
+        15,
+        3
+      ],
+      [
+        14,
+        4
+      ],
+      [
+        15,
+        4
+      ]
+    ],
+    "centerCells": [
+      [
+        9,
+        6
+      ],
+      [
+        10,
+        7
+      ]
+    ]
   },
   "unit": {
     "hp": 55,
-    "damage": 10,
+    "damage": 12,
     "attackRate": 1,
     "speed": 75,
     "radius": 9,
     "engageRadius": 120,
+    "moveDetectFactor": 0.5,
     "contactPad": 2,
     "playerColor": "#6fc0ff",
     "enemyColor": "#ff8a6a"
   },
   "buildings": {
-    "barracks": { "cost": 150, "buildTime": 6, "hp": 400, "unitCount": 3, "respawnTime": 8, "rallyRadius": 22 },
-    "turret": {
-      "cost": 100, "buildTime": 4, "hp": 250,
-      "range": 120, "fireRate": 1, "damage": 14, "projectileSpeed": 400, "projectileRadius": 4,
-      "playerProjectileColor": "#e9f5a0", "enemyProjectileColor": "#ffcf9a"
+    "barracks": {
+      "cost": 150,
+      "buildTime": 6,
+      "hp": 400,
+      "unitCount": 3,
+      "respawnTime": 12,
+      "rallyRadius": 22
     },
-    "depot": { "cost": 75, "buildTime": 3, "hp": 200, "popBonus": 4 }
+    "turret": {
+      "cost": 100,
+      "buildTime": 4,
+      "hp": 400,
+      "range": 120,
+      "fireRate": 1,
+      "damage": 20,
+      "projectileSpeed": 400,
+      "projectileRadius": 4,
+      "playerProjectileColor": "#e9f5a0",
+      "enemyProjectileColor": "#ffcf9a"
+    },
+    "depot": {
+      "cost": 75,
+      "buildTime": 3,
+      "hp": 200,
+      "popBonus": 4
+    }
   },
   "enemy": {
     "startCrystal": 150,
     "workerCount": 2,
-    "attackInterval": 90,
+    "attackInterval": 120,
     "waveDuration": 35,
-    "buildOrder": ["worker", "worker", "depot", "barracks", "barracks", "turret"],
+    "buildOrder": [
+      "worker",
+      "worker",
+      "depot",
+      "barracks",
+      "barracks",
+      "turret"
+    ],
     "layout": {
-      "depot": [[18, 2]],
-      "barracks": [[18, 3], [18, 4]],
-      "turret": [[16, 5]]
+      "depot": [
+        [
+          18,
+          2
+        ]
+      ],
+      "barracks": [
+        [
+          18,
+          3
+        ],
+        [
+          18,
+          4
+        ]
+      ],
+      "turret": [
+        [
+          16,
+          5
+        ]
+      ]
     }
   }
 }

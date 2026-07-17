@@ -12,8 +12,11 @@ import { TILE, pixelToCell, cellToPixel } from '../game/grid';
 import { Controls } from '../ui/controls';
 import { ConquestWorld } from './conquestWorld';
 import { ConquestSelection } from './conquestSelection';
+import { ConquestControlGroups } from './controlGroups';
 import { ConquestMenu } from './conquestMenu';
-import { renderConquestHud, renderConquestOverlay } from './conquestHud';
+import { renderConquestHud, renderConquestOverlay, renderAttackMoveCursor } from './conquestHud';
+import { renderMinimap, type MinimapData } from './minimap';
+import { bindConquestInput } from './conquestInput';
 import type { BuildKind } from './building';
 import type { ConquestPhase } from './conquestWorld';
 
@@ -35,9 +38,11 @@ export class ConquestGame {
   private readonly controls: Controls;
   private readonly menu: ConquestMenu;
   private readonly selection = new ConquestSelection();
+  private readonly groups = new ConquestControlGroups();
 
   private world = new ConquestWorld();
   private placeKind: BuildKind | null = null;
+  private attackMove = false; // A키 공격 이동 대기(좌클릭 지점으로 공격 이동).
   private hoverCell: { cx: number; cy: number } | null = null;
   private speed = 1;
   private active = false;
@@ -71,7 +76,20 @@ export class ConquestGame {
       onProduceWorker: () => this.world.produceWorker(),
     });
 
-    this.bindInput();
+    bindConquestInput({
+      input: this.input,
+      keyboard: this.keyboard,
+      selection: this.selection,
+      groups: this.groups,
+      getWorld: () => this.world,
+      isActive: () => this.active,
+      canInteract: () => this.canInteract(),
+      getPlaceKind: () => this.placeKind,
+      cancelPlace: () => this.cancelPlace(),
+      tryPlace: (x, y) => this.tryPlace(x, y),
+      isAttackMove: () => this.attackMove,
+      setAttackMove: (v) => (this.attackMove = v),
+    });
     this.setUiVisible(false);
   }
 
@@ -91,7 +109,9 @@ export class ConquestGame {
   private startWorld(): void {
     this.world = new ConquestWorld(this.audio);
     this.selection.reset();
+    this.groups.reset();
     this.placeKind = null;
+    this.attackMove = false;
     this.hoverCell = null;
     this.menu.setActiveBuilding(null);
     this.menu.showHqPanel(null);
@@ -120,60 +140,20 @@ export class ConquestGame {
   private toggleBuild(kind: BuildKind): void {
     this.placeKind = this.placeKind === kind ? null : kind;
     this.menu.setActiveBuilding(this.placeKind);
-    if (this.placeKind) this.selection.clear();
+    if (this.placeKind) {
+      this.selection.clear();
+      this.attackMove = false;
+    }
   }
 
-  // ── 입력 배선(active + playing일 때만 처리) ──────────────────
-  private bindInput(): void {
-    this.input.onClick((x, y) => {
-      if (!this.canInteract()) return;
-      if (this.placeKind) this.tryPlace(x, y);
-      else this.doSelect(x, y);
-    });
-    this.input.onRightClick((x, y) => {
-      if (!this.canInteract()) return;
-      if (this.placeKind) {
-        this.placeKind = null;
-        this.menu.setActiveBuilding(null);
-        return;
-      }
-      if (this.selection.hasUnits) this.world.commandUnits(this.selection.selectedUnits, x, y);
-      else if (this.selection.hasWorkers) this.commandWorkers(x, y);
-    });
-    this.input.onDrag({
-      onStart: (x, y) => this.canInteract() && this.selection.beginDrag(x, y),
-      onMove: (box) => this.canInteract() && this.selection.updateDrag(box),
-      onEnd: (box) => {
-        if (!this.canInteract()) return this.selection.cancelDrag();
-        this.selection.endDrag(box, this.world.playerUnits, this.world.workers);
-      },
-    });
-    this.keyboard.on('escape', () => {
-      if (!this.active) return;
-      if (this.placeKind) {
-        this.placeKind = null;
-        this.menu.setActiveBuilding(null);
-      } else {
-        this.selection.clear();
-      }
-    });
+  // 건설 모드 해제(입력 모듈이 취소 시 호출).
+  private cancelPlace(): void {
+    this.placeKind = null;
+    this.menu.setActiveBuilding(null);
   }
 
   private canInteract(): boolean {
     return this.active && this.world.phase === 'playing';
-  }
-
-  private doSelect(x: number, y: number): void {
-    this.selection.clickSelect(x, y, this.world.playerUnits, this.world.workers, this.world.playerHQ);
-  }
-
-  private commandWorkers(x: number, y: number): void {
-    const { cx, cy } = pixelToCell(x, y);
-    const crystal = this.world.crystals.find((c) => c.cx === cx && c.cy === cy && !c.depleted);
-    for (const w of this.selection.selectedWorkers) {
-      if (crystal) w.commandHarvest(crystal, this.world.grid);
-      else if (this.world.grid.isWalkable(cx, cy)) w.commandMove(cx, cy, this.world.grid);
-    }
   }
 
   private tryPlace(x: number, y: number): void {
@@ -191,6 +171,8 @@ export class ConquestGame {
     this.audio.resetFrame();
     this.updateHover();
     this.selection.prune(this.world.playerUnits, this.world.workers);
+    this.groups.prune();
+    if (this.attackMove && !this.selection.hasUnits) this.attackMove = false; // 대상 소멸 시 모드 해제.
     for (let i = 0; i < this.speed; i++) this.world.update(dt);
     this.syncPhase();
     this.syncUi();
@@ -255,17 +237,40 @@ export class ConquestGame {
     this.selection.renderRings(ctx); // 선택 링은 유닛 아래.
     for (const wk of w.allWorkers) wk.render(ctx);
     for (const u of w.units) u.render(ctx);
+    this.groups.renderBadges(ctx); // 부대 번호 뱃지는 유닛 위.
     w.combat.render(ctx); // 포탑 투사체.
     w.effects.render(ctx); // 처치 파티클.
     this.selection.renderDragBox(ctx);
+    if (this.attackMove && this.input.isInside) renderAttackMoveCursor(ctx, this.input.x, this.input.y);
 
     renderConquestHud(ctx, {
       crystal: w.crystal,
       popUsed: w.popUsed,
       popMax: w.popMax,
       secondsToAttack: w.secondsToAttack,
+      unitCount: w.playerUnits.length,
     });
+    renderMinimap(ctx, this.minimapData());
     renderConquestOverlay(ctx, w.phase);
+  }
+
+  // 미니맵에 넘길 좌표 묶음(양 진영 구조물·유닛). render에서만 조립하는 읽기 전용 스냅샷.
+  private minimapData(): MinimapData {
+    const w = this.world;
+    const playerStructures = [{ cx: w.playerHQ.cx, cy: w.playerHQ.cy }];
+    const enemyStructures = [{ cx: w.enemyHQ.cx, cy: w.enemyHQ.cy }];
+    for (const b of w.buildings) {
+      if (b.destroyed) continue;
+      (b.side === 'player' ? playerStructures : enemyStructures).push({ cx: b.cx, cy: b.cy });
+    }
+    const enemyUnits = w.units.filter((u) => u.side === 'enemy' && !u.dead);
+    return {
+      crystals: w.crystals,
+      playerStructures,
+      enemyStructures,
+      playerMobs: [...w.playerUnits, ...w.workers],
+      enemyMobs: [...enemyUnits, ...w.enemyAI.workers],
+    };
   }
 
   private renderGhost(ctx: CanvasRenderingContext2D): void {

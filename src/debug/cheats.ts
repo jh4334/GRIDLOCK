@@ -23,10 +23,11 @@ export interface CheatHooks {
 }
 
 export class DebugCheats {
-  constructor(keyboard: Keyboard, hooks: CheatHooks) {
-    keyboard.on('g', () => hooks.addGold(CHEAT_GOLD));
-    keyboard.on('n', () => hooks.skipWave());
-    keyboard.on('h', () => hooks.toggleHitboxes());
+  // isActive: 디펜스 모드가 활성일 때만 반응(정복 모드·타이틀에서 G/N/H가 새지 않게 격리).
+  constructor(keyboard: Keyboard, hooks: CheatHooks, isActive: () => boolean) {
+    keyboard.on('g', () => isActive() && hooks.addGold(CHEAT_GOLD));
+    keyboard.on('n', () => isActive() && hooks.skipWave());
+    keyboard.on('h', () => isActive() && hooks.toggleHitboxes());
   }
 }
 

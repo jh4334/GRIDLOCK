@@ -58,6 +58,9 @@ export class CombatUnit implements Combatant {
   path: Pt[] = [];
   // 명령받은 구조물/유닛 타겟(공격 이동). 없으면 대기 지점을 지킨다.
   orderedTarget: Combatant | null = null;
+  // 공격 이동(A키) 중 여부 — true면 이동 중에도 전체 engageRadius로 적 유닛·건물을 감지·교전한다.
+  // 일반 이동 명령은 false라 감지 반경이 절반이고 건물을 무시해 목적지까지 관통한다.
+  attackMove = false;
   // 대기(방어) 지점 — 소속 배럭 집결지. 명령이 없으면 이곳으로 복귀.
   guardX: number;
   guardY: number;

@@ -51,6 +51,13 @@ export class ConquestSelection {
     }
   }
 
+  /** 부대 선택 — 전투 유닛·일꾼을 동시에 선택(HQ 해제). 죽은 대상은 제외. */
+  selectGroup(units: CombatUnit[], workers: Worker[]): void {
+    this.clear();
+    this.units = units.filter((u) => !u.dead);
+    this.workers = workers.filter((w) => !w.dead);
+  }
+
   clear(): void {
     this.units = [];
     this.workers = [];

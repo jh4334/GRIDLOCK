@@ -150,14 +150,16 @@ export class MouseInput {
 // 키보드 입력 — 키별 keydown 핸들러를 등록한다. 키 자동 반복(e.repeat)은
 // 무시해 D 토글 같은 동작이 누르고 있는 동안 연타되지 않게 한다.
 export class Keyboard {
-  private handlers = new Map<string, () => void>();
+  // 핸들러는 원본 KeyboardEvent를 받아 수정자(Ctrl 등)를 판별할 수 있다. 인자를 무시하는
+  // 기존 `() => void` 핸들러도 그대로 호환된다(더 적은 인자 함수는 대입 가능).
+  private handlers = new Map<string, (e: KeyboardEvent) => void>();
 
   private readonly onKeyDown = (e: KeyboardEvent): void => {
     if (e.repeat) return;
     const fn = this.handlers.get(e.key.toLowerCase());
     if (fn) {
       e.preventDefault(); // 게임 조작 키의 기본 동작(예: Space 페이지 스크롤) 차단.
-      fn();
+      fn(e);
     }
   };
 
@@ -166,7 +168,7 @@ export class Keyboard {
   }
 
   /** key는 대소문자 무관('d', 'D' 동일). 같은 키 재등록 시 덮어쓴다. */
-  on(key: string, handler: () => void): void {
+  on(key: string, handler: (e: KeyboardEvent) => void): void {
     this.handlers.set(key.toLowerCase(), handler);
   }
 

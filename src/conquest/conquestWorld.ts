@@ -145,12 +145,20 @@ export class ConquestWorld {
     worker.commandBuild(b, this.grid);
     return true;
   }
+  // 건설 배정 일꾼 선택 — 이미 건설 중인 일꾼을 빼앗지 않도록 '건설 중 아닌' 일꾼을 우선하고,
+  // 그런 일꾼이 없을 때만 아무 일꾼이나 배정한다.
   private nearestWorker(cx: number, cy: number): Worker | null {
     const target = cellCenter(cx, cy);
+    return (
+      this.pickWorker(target, (w) => w.state !== 'toBuild' && w.state !== 'building') ??
+      this.pickWorker(target, () => true)
+    );
+  }
+  private pickWorker(target: { x: number; y: number }, ok: (w: Worker) => boolean): Worker | null {
     let best: Worker | null = null;
     let bestD = Infinity;
     for (const w of this.workers) {
-      if (w.dead) continue;
+      if (w.dead || !ok(w)) continue;
       const d = (w.x - target.x) ** 2 + (w.y - target.y) ** 2;
       if (d < bestD) {
         bestD = d;
@@ -179,11 +187,13 @@ export class ConquestWorld {
   }
 
   // ── 플레이어 유닛 명령(우클릭) ───────────────────────────────
-  /** 선택 유닛에게 이동/공격 명령 — 클릭 지점이 적 구조물/유닛 근처면 접근 후 공격. */
-  commandUnits(units: CombatUnit[], px: number, py: number): void {
+  /** 선택 유닛에게 이동/공격 명령 — 클릭 지점이 적 구조물/유닛 근처면 접근 후 공격.
+   *  attackMove=true(A키)면 경로 이동 중에도 전체 사거리로 적 유닛·건물을 감지·교전한다. */
+  commandUnits(units: CombatUnit[], px: number, py: number, attackMove = false): void {
     const { cx, cy } = pixelToCell(px, py);
     const target = this.hostileTargetAt(px, py, 'player');
     for (const u of units) {
+      u.attackMove = attackMove;
       if (target && target.structure) {
         const tcell = this.structureCell(target);
         const path = pathToStructure(this.grid, u.cell, tcell.cx, tcell.cy);
@@ -203,6 +213,16 @@ export class ConquestWorld {
           u.setGuard(cellCenter(cx, cy).x, cellCenter(cx, cy).y);
         }
       }
+    }
+  }
+
+  /** 선택 일꾼 명령 — 클릭 칸이 크리스탈이면 채집, 통행 칸이면 이동. */
+  commandWorkers(workers: Worker[], px: number, py: number): void {
+    const { cx, cy } = pixelToCell(px, py);
+    const crystal = this.crystals.find((c) => c.cx === cx && c.cy === cy && !c.depleted);
+    for (const w of workers) {
+      if (crystal) w.commandHarvest(crystal, this.grid);
+      else if (this.grid.isWalkable(cx, cy)) w.commandMove(cx, cy, this.grid);
     }
   }
 

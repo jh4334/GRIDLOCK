@@ -9,6 +9,7 @@ export interface ConquestHudInfo {
   popUsed: number;
   popMax: number;
   secondsToAttack: number;
+  unitCount: number; // 아군 전투 유닛 수(병력).
 }
 
 const OVERLAY_BG = 'rgba(0, 0, 0, 0.72)';
@@ -35,6 +36,29 @@ export function renderConquestHud(ctx: CanvasRenderingContext2D, info: ConquestH
   ctx.textAlign = 'left';
   ctx.fillText(`적 공격까지 ${info.secondsToAttack}초`, 8, 8);
 
+  // 아군 병력 수(배럭 선택 없이도 현재 병력 확인).
+  ctx.fillStyle = '#9ad0ff';
+  ctx.fillText(`병력 ${info.unitCount}`, 8, 28);
+
+  ctx.restore();
+}
+
+/** 공격 이동(A키) 대기 커서 — 마우스 위치에 붉은 십자 + 라벨(읽기 전용). */
+export function renderAttackMoveCursor(ctx: CanvasRenderingContext2D, x: number, y: number): void {
+  ctx.save();
+  ctx.strokeStyle = '#ff6b6b';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(x - 9, y);
+  ctx.lineTo(x + 9, y);
+  ctx.moveTo(x, y - 9);
+  ctx.lineTo(x, y + 9);
+  ctx.stroke();
+  ctx.font = 'bold 11px monospace';
+  ctx.fillStyle = '#ff6b6b';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  ctx.fillText('공격 이동', x + 12, y + 6);
   ctx.restore();
 }
 

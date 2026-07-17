@@ -55,13 +55,16 @@ export class ConquestCombat {
 
   // ── 근접 유닛 1기 ────────────────────────────────────────────
   private updateUnit(dt: number, u: CombatUnit, units: CombatUnit[], buildings: Building[], playerHQ: HQ, enemyHQ: HQ): void {
-    const radius = C.unit.engageRadius;
+    // 교전 태세: 공격 이동 / 지정 타겟 보유 / 경로 없이 대기(방어) 중이면 전체 사거리로 유닛·건물 모두 감지.
+    // 반대로 일반 이동 중(경로 있음·비교전)에는 감지 반경을 절반으로 줄이고 건물을 무시해 목적지로 관통한다.
+    const engaging = u.attackMove || u.orderedTarget !== null || u.path.length === 0;
+    const radius = engaging ? C.unit.engageRadius : C.unit.engageRadius * C.unit.moveDetectFactor;
     const r2 = radius * radius;
 
     // (1) 사거리 내 최근접 적 유닛 우선.
     let target: Combatant | null = this.nearestEnemyUnit(u, units, r2);
-    // (2) 없으면 사거리 내 적 건물/HQ(명령 타겟이 유효하면 그쪽 우선).
-    if (!target) target = this.nearestEnemyStructure(u, buildings, playerHQ, enemyHQ, r2);
+    // (2) 교전 태세일 때만 사거리 내 적 건물/HQ도 대상에 포함(일반 이동은 건물 무시).
+    if (!target && engaging) target = this.nearestEnemyStructure(u, buildings, playerHQ, enemyHQ, r2);
 
     if (target) {
       this.engage(dt, u, target);

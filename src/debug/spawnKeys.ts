@@ -13,7 +13,8 @@ export class DebugSpawner {
   private queue: EnemyKind[] = [];
   private timer = 0;
 
-  constructor(keyboard: Keyboard, private spawn: (kind: EnemyKind) => void) {
+  // isActive: 디펜스 모드가 활성일 때만 숫자키 스폰이 반응(정복 모드 부대 숫자키와 격리).
+  constructor(keyboard: Keyboard, private spawn: (kind: EnemyKind) => void, private isActive: () => boolean) {
     keyboard.on('1', () => this.enqueue('runner', 1));
     keyboard.on('2', () => this.enqueue('grunt', 1));
     keyboard.on('3', () => this.enqueue('tanker', 1));
@@ -22,6 +23,7 @@ export class DebugSpawner {
   }
 
   private enqueue(kind: EnemyKind, count: number): void {
+    if (!this.isActive()) return;
     for (let i = 0; i < count; i++) this.queue.push(kind);
   }
 
