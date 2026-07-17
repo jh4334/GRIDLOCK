@@ -23,15 +23,35 @@ export class MouseInput {
     this.inside = false;
   };
 
+  // 클릭 콜백(설치/선택용). 좌표는 mousemove와 동일한 보정을 거쳐 넘긴다.
+  private clickHandler: ((x: number, y: number) => void) | null = null;
+
+  private readonly onClickEvent = (e: MouseEvent): void => {
+    if (!this.clickHandler) return;
+    const rect = this.canvas.getBoundingClientRect();
+    const scaleX = this.canvas.width / rect.width;
+    const scaleY = this.canvas.height / rect.height;
+    const x = (e.clientX - rect.left) * scaleX;
+    const y = (e.clientY - rect.top) * scaleY;
+    this.clickHandler(x, y);
+  };
+
   constructor(private canvas: HTMLCanvasElement) {
     canvas.addEventListener('mousemove', this.onMove);
     canvas.addEventListener('mouseleave', this.onLeave);
+    canvas.addEventListener('click', this.onClickEvent);
+  }
+
+  /** 캔버스 클릭 핸들러 등록. 좌표는 캔버스 내부 픽셀 좌표로 보정된 값. */
+  onClick(handler: (x: number, y: number) => void): void {
+    this.clickHandler = handler;
   }
 
   /** 이벤트 리스너 해제 (현재 미사용, 정리용). */
   dispose(): void {
     this.canvas.removeEventListener('mousemove', this.onMove);
     this.canvas.removeEventListener('mouseleave', this.onLeave);
+    this.canvas.removeEventListener('click', this.onClickEvent);
   }
 
   get x(): number {

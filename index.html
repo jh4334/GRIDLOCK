@@ -23,11 +23,75 @@
         background: #24242c;
         image-rendering: pixelated;
       }
+      #build-menu {
+        margin-top: 12px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+        width: 960px;
+      }
+      .tower-buttons {
+        display: flex;
+        gap: 10px;
+      }
+      .tower-btn {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 2px;
+        min-width: 84px;
+        padding: 8px 12px;
+        background: #2c2c36;
+        color: #e0e0e0;
+        border: 2px solid #3a3a46;
+        border-radius: 6px;
+        font-family: inherit;
+        font-size: 14px;
+        cursor: pointer;
+      }
+      .tower-btn .t-cost {
+        color: #ffd166;
+        font-size: 12px;
+      }
+      .tower-btn:hover:not(:disabled) {
+        border-color: #6a6a7a;
+      }
+      .tower-btn.active {
+        border-color: #7bd67b;
+        background: #33413a;
+      }
+      .tower-btn.unaffordable,
+      .tower-btn:disabled {
+        color: #6a6a72;
+        background: #24242a;
+        cursor: not-allowed;
+      }
+      .tower-btn.unaffordable .t-cost {
+        color: #7a6a3a;
+      }
+      .sell-slot {
+        min-height: 36px;
+      }
+      .sell-btn {
+        padding: 8px 16px;
+        background: #7a2e2e;
+        color: #ffe0e0;
+        border: 2px solid #a04040;
+        border-radius: 6px;
+        font-family: inherit;
+        font-size: 14px;
+        cursor: pointer;
+      }
+      .sell-btn:hover {
+        background: #993333;
+      }
     </style>
   </head>
   <body>
     <div id="app">
       <canvas id="game-canvas" width="960" height="672"></canvas>
+      <div id="build-menu"></div>
     </div>
     <script type="module" src="/src/main.ts"></script>
   </body>

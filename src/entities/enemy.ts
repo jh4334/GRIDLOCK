@@ -6,7 +6,7 @@
 // 부드럽게 연속 이동한다.
 
 import enemiesData from '../data/enemies.json';
-import { SPAWN, cellCenter } from '../game/grid';
+import { SPAWN, cellCenter, pixelToCell } from '../game/grid';
 import type { FlowField } from '../systems/pathfinding';
 
 export type EnemyKind = keyof typeof enemiesData;
@@ -121,6 +121,24 @@ export class Enemy {
   /** 기지까지 남은 BFS 스텝 수(진행도). 작을수록 앞선 적. 도달 불가면 -1. */
   distanceToBase(field: FlowField): number {
     return field.getDistance(this.cx, this.cy);
+  }
+
+  /** 몸통 중심이 현재 기하학적으로 속한 칸. 타워 설치 점유 검사·재경로의 기준. */
+  get cell(): { cx: number; cy: number } {
+    return pixelToCell(this.x, this.y);
+  }
+
+  /**
+   * 플로우필드가 바뀐 뒤(타워 설치·판매) 호출. 현재 몸통이 속한 칸을 기준으로
+   * 다음 목표 칸을 다시 정한다. 향하던 칸이 벽이 됐어도 새 방향으로 자연스럽게
+   * 우회하며, 점유 중인 칸은 설치가 금지되므로 벽으로 걸어 들어갈 일은 없다.
+   */
+  reroute(field: FlowField): void {
+    if (this.reachedBase || this.dead) return;
+    const { cx, cy } = pixelToCell(this.x, this.y);
+    this.cx = cx;
+    this.cy = cy;
+    this.pickNextTarget(field);
   }
 
   // 렌더는 상태를 읽기만 한다(변경 없음).

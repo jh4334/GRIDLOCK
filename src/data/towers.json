@@ -1,0 +1,29 @@
+{
+  "arrow": {
+    "name": "애로우",
+    "cost": 50,
+    "range": 120,
+    "fireRate": 1.0,
+    "damage": 12,
+    "color": "#5fb85f"
+  },
+  "cannon": {
+    "name": "캐논",
+    "cost": 90,
+    "range": 100,
+    "fireRate": 0.5,
+    "damage": 25,
+    "splashRadius": 40,
+    "color": "#c8623a"
+  },
+  "frost": {
+    "name": "프로스트",
+    "cost": 70,
+    "range": 110,
+    "fireRate": 0.8,
+    "damage": 5,
+    "slowFactor": 0.4,
+    "slowDuration": 2,
+    "color": "#4fb0d6"
+  }
+}

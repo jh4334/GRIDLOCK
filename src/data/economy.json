@@ -1,4 +1,5 @@
 {
   "startGold": 220,
-  "startLives": 20
+  "startLives": 20,
+  "sellRefundRate": 0.7
 }
