@@ -7,13 +7,15 @@
 
 import conquestData from '../data/conquest.json';
 import { MouseInput, Keyboard } from '../core/input';
+import { AudioEngine } from '../core/audio';
 import { TILE, pixelToCell, cellToPixel } from '../game/grid';
 import { Controls } from '../ui/controls';
 import { ConquestWorld } from './conquestWorld';
 import { ConquestSelection } from './conquestSelection';
 import { ConquestMenu } from './conquestMenu';
-import { renderConquestHud } from './conquestHud';
+import { renderConquestHud, renderConquestOverlay } from './conquestHud';
 import type { BuildKind } from './building';
+import type { ConquestPhase } from './conquestWorld';
 
 const SPEEDS = [1, 2, 3];
 const BUILD_LABELS: Record<BuildKind, string> = { barracks: '배럭', turret: '포탑', depot: '보급고' };
@@ -29,6 +31,7 @@ export class ConquestGame {
   private readonly canvas: HTMLCanvasElement;
   private readonly input: MouseInput;
   private readonly keyboard = new Keyboard();
+  private readonly audio = new AudioEngine();
   private readonly controls: Controls;
   private readonly menu: ConquestMenu;
   private readonly selection = new ConquestSelection();
@@ -42,6 +45,7 @@ export class ConquestGame {
   // UI 갱신 캐시(값이 바뀔 때만 DOM 재구성 → 깜빡임 방지).
   private lastCrystal = -1;
   private lastHqSig = '';
+  private lastPhase: ConquestPhase = 'playing';
 
   constructor(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D, deps: ConquestDeps) {
     this.canvas = canvas;
@@ -53,9 +57,9 @@ export class ConquestGame {
       rootId: 'conquest-controls',
       showNextWave: false,
       onSetSpeed: (s) => this.setSpeed(s),
+      onRestart: () => this.restart(),
       onToTitle: () => deps.onExit(),
     });
-    this.controls.setToTitleVisible(true); // 정복은 '타이틀로'를 항상 노출(승/패 개념은 후반부).
 
     this.menu = new ConquestMenu({
       buildings: (Object.keys(conquestData.buildings) as BuildKind[]).map((kind) => ({
@@ -73,7 +77,19 @@ export class ConquestGame {
 
   // ── 모드 진입/정리 ───────────────────────────────────────────
   activate(): void {
-    this.world = new ConquestWorld();
+    this.startWorld();
+    this.setUiVisible(true);
+    this.active = true;
+  }
+
+  deactivate(): void {
+    this.active = false;
+    this.setUiVisible(false);
+  }
+
+  // 새 판 시작(진입·다시 시작 공통) — 월드·선택·UI 상태를 초기화한다.
+  private startWorld(): void {
+    this.world = new ConquestWorld(this.audio);
     this.selection.reset();
     this.placeKind = null;
     this.hoverCell = null;
@@ -82,13 +98,13 @@ export class ConquestGame {
     this.setSpeed(1);
     this.lastCrystal = -1;
     this.lastHqSig = '';
-    this.setUiVisible(true);
-    this.active = true;
+    this.lastPhase = 'playing';
+    this.controls.showRestart(false);
+    this.controls.setToTitleVisible(true); // '타이틀로'는 항상 노출.
   }
 
-  deactivate(): void {
-    this.active = false;
-    this.setUiVisible(false);
+  private restart(): void {
+    this.startWorld();
   }
 
   private setUiVisible(show: boolean): void {
@@ -104,31 +120,32 @@ export class ConquestGame {
   private toggleBuild(kind: BuildKind): void {
     this.placeKind = this.placeKind === kind ? null : kind;
     this.menu.setActiveBuilding(this.placeKind);
-    if (this.placeKind) this.selection.clear(); // 건설 모드 진입 시 선택 해제.
+    if (this.placeKind) this.selection.clear();
   }
 
-  // ── 입력 배선(active일 때만 처리) ────────────────────────────
+  // ── 입력 배선(active + playing일 때만 처리) ──────────────────
   private bindInput(): void {
     this.input.onClick((x, y) => {
-      if (!this.active) return;
+      if (!this.canInteract()) return;
       if (this.placeKind) this.tryPlace(x, y);
       else this.doSelect(x, y);
     });
     this.input.onRightClick((x, y) => {
-      if (!this.active) return;
+      if (!this.canInteract()) return;
       if (this.placeKind) {
-        this.placeKind = null; // 우클릭으로 건설 모드 취소.
+        this.placeKind = null;
         this.menu.setActiveBuilding(null);
         return;
       }
-      if (this.selection.hasWorkers) this.commandWorkers(x, y);
+      if (this.selection.hasUnits) this.world.commandUnits(this.selection.selectedUnits, x, y);
+      else if (this.selection.hasWorkers) this.commandWorkers(x, y);
     });
     this.input.onDrag({
-      onStart: (x, y) => this.active && this.selection.beginDrag(x, y),
-      onMove: (box) => this.active && this.selection.updateDrag(box),
+      onStart: (x, y) => this.canInteract() && this.selection.beginDrag(x, y),
+      onMove: (box) => this.canInteract() && this.selection.updateDrag(box),
       onEnd: (box) => {
-        if (!this.active) return this.selection.cancelDrag();
-        this.selection.endDrag(box, this.world.workers);
+        if (!this.canInteract()) return this.selection.cancelDrag();
+        this.selection.endDrag(box, this.world.playerUnits, this.world.workers);
       },
     });
     this.keyboard.on('escape', () => {
@@ -142,8 +159,12 @@ export class ConquestGame {
     });
   }
 
+  private canInteract(): boolean {
+    return this.active && this.world.phase === 'playing';
+  }
+
   private doSelect(x: number, y: number): void {
-    this.selection.clickSelect(x, y, this.world.workers, this.world.playerHQ);
+    this.selection.clickSelect(x, y, this.world.playerUnits, this.world.workers, this.world.playerHQ);
   }
 
   private commandWorkers(x: number, y: number): void {
@@ -160,26 +181,39 @@ export class ConquestGame {
     const { cx, cy } = pixelToCell(x, y);
     const kind = this.placeKind;
     if (this.world.startBuild(kind, cx, cy)) {
-      if (this.world.crystal < this.world.buildSpec(kind).cost) this.toggleBuild(kind); // 더 못 지으면 모드 해제.
+      if (this.world.crystal < this.world.buildSpec(kind).cost) this.toggleBuild(kind);
     }
   }
 
   // ── update ───────────────────────────────────────────────────
   update(dt: number): void {
     if (!this.active) return;
+    this.audio.resetFrame();
     this.updateHover();
-    this.selection.prune(this.world.workers);
+    this.selection.prune(this.world.playerUnits, this.world.workers);
     for (let i = 0; i < this.speed; i++) this.world.update(dt);
+    this.syncPhase();
     this.syncUi();
   }
 
   private updateHover(): void {
-    if (this.placeKind && this.input.isInside) {
+    if (this.placeKind && this.input.isInside && this.world.phase === 'playing') {
       const { cx, cy } = pixelToCell(this.input.x, this.input.y);
       this.hoverCell = this.world.grid.inBounds(cx, cy) ? { cx, cy } : null;
     } else {
       this.hoverCell = null;
     }
+  }
+
+  // 승패 전환 시(1회) 결과음 재생 + '다시 시작' 노출.
+  private syncPhase(): void {
+    if (this.world.phase === this.lastPhase) return;
+    this.lastPhase = this.world.phase;
+    const over = this.world.phase !== 'playing';
+    this.controls.showRestart(over);
+    if (!over) this.controls.setToTitleVisible(true);
+    if (this.world.phase === 'won') this.audio.win();
+    else if (this.world.phase === 'lost') this.audio.lose();
   }
 
   private syncUi(): void {
@@ -219,11 +253,19 @@ export class ConquestGame {
     for (const b of w.buildings) b.render(ctx, false);
 
     this.selection.renderRings(ctx); // 선택 링은 유닛 아래.
-    for (const wk of w.workers) wk.render(ctx);
-    for (const b of w.buildings) if (b.barracks) for (const s of b.barracks.soldiers) s.render(ctx);
+    for (const wk of w.allWorkers) wk.render(ctx);
+    for (const u of w.units) u.render(ctx);
+    w.combat.render(ctx); // 포탑 투사체.
+    w.effects.render(ctx); // 처치 파티클.
     this.selection.renderDragBox(ctx);
 
-    renderConquestHud(ctx, { crystal: w.crystal, popUsed: w.popUsed, popMax: w.popMax });
+    renderConquestHud(ctx, {
+      crystal: w.crystal,
+      popUsed: w.popUsed,
+      popMax: w.popMax,
+      secondsToAttack: w.secondsToAttack,
+    });
+    renderConquestOverlay(ctx, w.phase);
   }
 
   private renderGhost(ctx: CanvasRenderingContext2D): void {

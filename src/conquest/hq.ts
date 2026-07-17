@@ -23,6 +23,7 @@ export class HQ {
   readonly cy: number;
   readonly maxHp: number;
   hp: number;
+  readonly structure = true; // Combatant 계약 — HQ는 고정 구조물.
 
   // 생산 큐 — 각 원소 = 남은 생산 시간(초). 선두부터 진행.
   private queue: number[] = [];
@@ -41,6 +42,20 @@ export class HQ {
 
   occupies(cx: number, cy: number): boolean {
     return cx === this.cx && cy === this.cy;
+  }
+
+  // Combatant 계약 — HQ는 공격 대상이 될 수 있다(중심 좌표·반경·파괴 판정).
+  get x(): number {
+    return cellCenter(this.cx, this.cy).x;
+  }
+  get y(): number {
+    return cellCenter(this.cx, this.cy).y;
+  }
+  get radius(): number {
+    return TILE * 0.42;
+  }
+  get dead(): boolean {
+    return this.hp <= 0;
   }
 
   get queueCount(): number {
