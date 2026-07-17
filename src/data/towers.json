@@ -5,7 +5,10 @@
     "range": 120,
     "fireRate": 1.0,
     "damage": 12,
-    "color": "#5fb85f"
+    "color": "#5fb85f",
+    "projectileSpeed": 400,
+    "projectileRadius": 4,
+    "projectileColor": "#e9f5a0"
   },
   "cannon": {
     "name": "캐논",
@@ -14,7 +17,10 @@
     "fireRate": 0.5,
     "damage": 25,
     "splashRadius": 40,
-    "color": "#c8623a"
+    "color": "#c8623a",
+    "projectileSpeed": 300,
+    "projectileRadius": 6,
+    "projectileColor": "#f0a45a"
   },
   "frost": {
     "name": "프로스트",
@@ -24,6 +30,9 @@
     "damage": 5,
     "slowFactor": 0.4,
     "slowDuration": 2,
-    "color": "#4fb0d6"
+    "color": "#4fb0d6",
+    "projectileSpeed": 240,
+    "projectileRadius": 5,
+    "projectileColor": "#bfe8f7"
   }
 }

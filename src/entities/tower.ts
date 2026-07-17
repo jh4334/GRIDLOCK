@@ -15,6 +15,9 @@ export interface TowerSpec {
   fireRate: number; // 회/s
   damage: number;
   color: string;
+  projectileSpeed: number; // px/s
+  projectileRadius: number; // px (투사체 크기 + 명중 여유)
+  projectileColor: string;
   splashRadius?: number; // 캐논 전용
   slowFactor?: number; // 프로스트 전용 — 이속 감소 비율
   slowDuration?: number; // 프로스트 전용 — 초
@@ -37,6 +40,8 @@ export class Tower {
   readonly cy: number;
   // 누적 투자액 — 판매 환급(invested × sellRefundRate) 계산용. M7 업그레이드 시 증가.
   invested: number;
+  // 발사 쿨다운(초). 0 이하면 발사 가능. combat 시스템이 감소·갱신한다.
+  cooldown = 0;
 
   constructor(kind: TowerKind, cx: number, cy: number) {
     this.kind = kind;

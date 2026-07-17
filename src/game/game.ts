@@ -10,6 +10,7 @@ import { Grid, TILE, cellToPixel, pixelToCell } from './grid';
 import { Economy } from './economy';
 import { computeFlowField, FlowField } from '../systems/pathfinding';
 import { isCellPlaceable, isPathClear } from '../systems/placement';
+import { CombatSystem } from '../systems/combat';
 import { Enemy, createEnemy } from '../entities/enemy';
 import { Tower, towerSpec, TowerKind, TOWER_INSET } from '../entities/tower';
 import towersData from '../data/towers.json';
@@ -48,6 +49,7 @@ export class Game {
   private readonly hud = new Hud();
   private readonly buildMenu: BuildMenu;
   private readonly spawner: DebugSpawner;
+  private readonly combat = new CombatSystem();
 
   private flowField: FlowField;
   private enemies: Enemy[] = [];
@@ -219,6 +221,8 @@ export class Game {
     }
 
     for (const e of this.enemies) e.update(dt, this.flowField);
+    // 전투(타겟팅·발사·명중·데미지·처치 골드)는 combat 시스템이 담당.
+    this.combat.update(dt, this.towers, this.enemies, this.economy, this.flowField);
     for (const e of this.enemies) if (e.reachedBase) this.economy.loseLife(1);
     this.enemies = this.enemies.filter((e) => !e.dead && !e.reachedBase);
 
@@ -233,7 +237,7 @@ export class Game {
     const ctx = this.ctx;
     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
-    // 그리드(정적) → 플로우 디버그 → 호버/고스트 → 타워 → 거부 플래시 → 적 → HUD → FPS.
+    // 그리드(정적) → 플로우 디버그 → 호버/고스트 → 타워 → 거부 플래시 → 적 → 전투(투사체·폭발) → HUD → FPS.
     this.grid.render(ctx);
     if (this.showFlowDebug) renderFlowField(ctx, this.flowField);
 
@@ -243,6 +247,7 @@ export class Game {
     for (const t of this.towers) t.render(ctx, t === this.selectedTower);
     if (this.flash) this.renderFlash(ctx, this.flash);
     for (const e of this.enemies) e.render(ctx);
+    this.combat.render(ctx); // 투사체·폭발은 적 위에 그린다.
 
     this.hud.render(ctx, this.economy);
     this.fps.render(ctx);

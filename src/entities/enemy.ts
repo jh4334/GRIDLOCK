@@ -25,6 +25,10 @@ const EPS = 1e-6;
 const HP_BAR_HEIGHT = 4;
 const HP_BAR_GAP = 6; // 몸통 위 여백.
 
+// 슬로우 시각 표시(밸런스 아님, 시각 상수).
+const COLOR_SLOW_TINT = 'rgba(150, 220, 255, 0.35)';
+const COLOR_SLOW_RING = 'rgba(150, 220, 255, 0.9)';
+
 export class Enemy {
   readonly kind: EnemyKind;
   readonly maxHp: number;
@@ -46,6 +50,10 @@ export class Enemy {
 
   reachedBase = false; // 기지 칸 중심 도달 → 게임 쪽에서 라이프 감소 후 제거.
   dead = false; // M4 처치용. 프레임 끝 filter로 일괄 제거.
+
+  // 슬로우 상태(프로스트) — 이동 속도에만 적용. 중첩 없이 리프레시.
+  private slowFactor = 0; // 이속 감소 비율(0 = 감속 없음).
+  private slowTimer = 0; // 남은 감속 시간(초).
 
   constructor(kind: EnemyKind, field: FlowField) {
     const spec = enemiesData[kind] as EnemySpec;
@@ -85,7 +93,14 @@ export class Enemy {
   update(dt: number, field: FlowField): void {
     if (this.reachedBase || this.dead) return;
 
-    let budget = this.speed * dt;
+    // 슬로우 타이머 감소 → 남아있으면 이번 프레임 이속에 감속 배율 적용.
+    if (this.slowTimer > 0) {
+      this.slowTimer -= dt;
+      if (this.slowTimer <= 0) this.slowTimer = 0;
+    }
+    const speedMult = this.slowTimer > 0 ? 1 - this.slowFactor : 1;
+
+    let budget = this.speed * speedMult * dt;
     while (budget > 0 && !this.reachedBase) {
       const target = cellCenter(this.tx, this.ty);
       const ddx = target.x - this.x;
@@ -123,6 +138,23 @@ export class Enemy {
     return field.getDistance(this.cx, this.cy);
   }
 
+  /** 다음 목표 칸 중심까지 남은 픽셀 거리(타겟팅 동률 판정 보조). 작을수록 앞섬. */
+  distanceToNextCenter(): number {
+    const c = cellCenter(this.tx, this.ty);
+    return Math.hypot(c.x - this.x, c.y - this.y);
+  }
+
+  /** 슬로우 적용 — 중첩 없이 배율·타이머를 리프레시. 이동 속도에만 반영된다. */
+  applySlow(factor: number, duration: number): void {
+    this.slowFactor = factor;
+    this.slowTimer = duration;
+  }
+
+  /** 현재 감속 중인가(시각 표시용). */
+  get slowed(): boolean {
+    return this.slowTimer > 0;
+  }
+
   /** 몸통 중심이 현재 기하학적으로 속한 칸. 타워 설치 점유 검사·재경로의 기준. */
   get cell(): { cx: number; cy: number } {
     return pixelToCell(this.x, this.y);
@@ -148,6 +180,21 @@ export class Enemy {
     ctx.beginPath();
     ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
     ctx.fill();
+
+    // 슬로우 표시 — 옅은 하늘색 틴트 + 테두리.
+    if (this.slowed) {
+      ctx.save();
+      ctx.fillStyle = COLOR_SLOW_TINT;
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = COLOR_SLOW_RING;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.radius + 1, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
 
     // HP바.
     const ratio = Math.max(0, this.hp / this.maxHp);
