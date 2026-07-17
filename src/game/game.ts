@@ -11,6 +11,7 @@ import { Grid } from './grid';
 import { Economy } from './economy';
 import { computeFlowField, FlowField } from '../systems/pathfinding';
 import { CombatSystem } from '../systems/combat';
+import { MeleeSystem } from '../systems/melee';
 import { EffectsSystem } from '../systems/effects';
 import { AudioEngine } from '../core/audio';
 import { ScreenShake } from './screenShake';
@@ -43,6 +44,7 @@ export class Game {
   private readonly buildMenu: BuildMenu;
   private readonly spawner: DebugSpawner;
   private readonly combat: CombatSystem;
+  private readonly melee: MeleeSystem;
   private readonly effects = new EffectsSystem();
   private readonly audio = new AudioEngine();
   private readonly shake = new ScreenShake();
@@ -85,6 +87,17 @@ export class Game {
       onCannonHit: () => {
         this.shake.trigger();
         this.audio.boom();
+      },
+    });
+
+    // 근접 전투(병사↔적) — 처치·사망 이펙트를 combat과 같은 훅 방식으로 배선(M10).
+    this.melee = new MeleeSystem({
+      onEnemyKilled: (x, y, color) => {
+        this.effects.spawnKill(x, y, color);
+        this.audio.kill();
+      },
+      onSoldierKilled: (x, y, color) => {
+        this.effects.spawnKill(x, y, color); // 병사는 시체 없이 파티클만.
       },
     });
 
@@ -166,6 +179,10 @@ export class Game {
       if (this.flow.state === 'menu') this.flow.startGame();
       else this.interaction.handleClick(x, y);
     });
+    // 우클릭 — 게임 중일 때만 선택된 배럭의 집결지 지정(M10). contextmenu는 input이 항상 차단.
+    this.input.onRightClick((x, y) => {
+      if (this.flow.state === 'playing') this.interaction.handleRightClick(x, y);
+    });
     this.keyboard.on('d', () => {
       this.showFlowDebug = !this.showFlowDebug;
     });
@@ -213,6 +230,7 @@ export class Game {
     this.fps.update(dt);
     this.interaction.updateHover(this.input);
     this.interaction.updateFlash(dt);
+    this.interaction.updatePanel(); // 배럭 선택 시 병사 수/리스폰 실시간 반영(값 변할 때만).
     this.shake.update(dt); // 화면흔들림은 실시간 기준 1회/프레임.
 
     // 게임 월드는 playing 상태에서만, 배속 수만큼 서브스텝으로 갱신.
@@ -228,6 +246,9 @@ export class Game {
     if (this.flow.state !== 'playing') return; // 서브스텝 중 승/패 전환 시 잔여 스텝 중단.
     this.spawner.update(dt);
 
+    // 근접 전투는 적 이동보다 먼저 — 블로킹(enemy.blocked)을 이번 프레임에 세운 뒤,
+    // 이어지는 적 update가 그 플래그를 보고 이동을 건너뛴다(교전 중 적 정지).
+    this.melee.update(dt, this.interaction.barracks, this.enemies, this.economy);
     for (const e of this.enemies) e.update(dt, this.flowField);
     // 전투(타겟팅·발사·명중·데미지·처치 골드)는 combat 시스템이 담당.
     this.combat.update(dt, this.interaction.towers, this.enemies, this.economy, this.flowField);
@@ -282,6 +303,7 @@ export class Game {
     this.interaction.renderFlash(ctx);
 
     for (const e of this.enemies) e.render(ctx);
+    this.interaction.renderUnits(ctx); // 병사·집결지 마커는 적 위에 그린다(M10).
     this.combat.render(ctx); // 투사체·폭발은 적 위에 그린다.
     this.effects.render(ctx); // 데미지 숫자·처치 파티클은 최상단.
 

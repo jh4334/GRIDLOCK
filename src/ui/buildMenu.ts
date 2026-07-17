@@ -14,6 +14,15 @@ interface TowerButtonInfo {
 }
 
 // 선택된 타워의 정보 패널에 표시할 값(전부 계산 완료 상태로 전달받는다).
+// 배럭 선택 시 표시할 병사 정보(M10). 존재하면 공격력/사거리/공속 대신 이 값을 보여준다.
+export interface SoldierPanelInfo {
+  alive: number; // 현재 생존 병사 수.
+  count: number; // 유지 목표 병사 수.
+  respawning: number; // 리스폰 대기 중인 병사 수.
+  hp: number; // 병사 최대 HP(레벨 반영).
+  damage: number; // 병사 공격력(레벨 반영).
+}
+
 export interface TowerPanelInfo {
   name: string;
   level: number;
@@ -21,6 +30,7 @@ export interface TowerPanelInfo {
   damage: number;
   range: number;
   fireRate: number;
+  soldier?: SoldierPanelInfo; // 배럭 전용 — 있으면 병사 스탯 패널로 렌더.
   upgradeCost: number | null; // null = 최대 레벨(업그레이드 버튼 비활성 + "최대 레벨").
   canAffordUpgrade: boolean; // 골드 충분 여부(업그레이드 버튼 활성 조건).
   refund: number; // 판매 시 환급 골드.
@@ -103,10 +113,20 @@ export class BuildMenu {
 
     const stats = document.createElement('div');
     stats.className = 'tp-stats';
-    stats.innerHTML =
-      `<span>공격력 ${info.damage}</span>` +
-      `<span>사거리 ${info.range}</span>` +
-      `<span>공속 ${info.fireRate}/s</span>`;
+    if (info.soldier) {
+      // 배럭 — 병사 수(생존/목표, 리스폰 대기) + 병사 스탯.
+      const s = info.soldier;
+      const respawn = s.respawning > 0 ? ` (리스폰 ${s.respawning})` : '';
+      stats.innerHTML =
+        `<span>병사 ${s.alive}/${s.count}${respawn}</span>` +
+        `<span>병사HP ${s.hp}</span>` +
+        `<span>공격력 ${s.damage}</span>`;
+    } else {
+      stats.innerHTML =
+        `<span>공격력 ${info.damage}</span>` +
+        `<span>사거리 ${info.range}</span>` +
+        `<span>공속 ${info.fireRate}/s</span>`;
+    }
     panel.appendChild(stats);
 
     const actions = document.createElement('div');

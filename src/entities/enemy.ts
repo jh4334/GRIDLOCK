@@ -17,6 +17,8 @@ interface EnemySpec {
   reward: number;
   color: string;
   radius: number; // px
+  meleeDamage: number; // 접촉 시 병사에게 주는 데미지(M10)
+  meleeRate: number; // 근접 공격 공속(회/s)
 }
 
 const EPS = 1e-6;
@@ -36,8 +38,14 @@ export class Enemy {
   readonly reward: number;
   readonly color: string;
   readonly radius: number;
+  readonly meleeDamage: number; // 접촉한 병사에게 주는 데미지(M10).
+  readonly meleeRate: number; // 근접 공속(회/s).
 
   hp: number;
+  // 병사와 교전 중 이동 정지(M10). melee 시스템이 매 프레임 재판정한다.
+  blocked = false;
+  // 근접 반격 쿨다운(초). melee 시스템이 감소·갱신한다(combat의 tower.cooldown과 동일 패턴).
+  meleeCooldown = 0;
   // 칸 중심 기준 픽셀 좌표.
   x: number;
   y: number;
@@ -65,6 +73,8 @@ export class Enemy {
     this.reward = spec.reward;
     this.color = spec.color;
     this.radius = spec.radius;
+    this.meleeDamage = spec.meleeDamage;
+    this.meleeRate = spec.meleeRate;
 
     this.cx = SPAWN.cx;
     this.cy = SPAWN.cy;
@@ -100,6 +110,9 @@ export class Enemy {
       if (this.slowTimer <= 0) this.slowTimer = 0;
     }
     const speedMult = this.slowTimer > 0 ? 1 - this.slowFactor : 1;
+
+    // 병사에게 블로킹당하면 이번 프레임 이동만 정지(슬로우 타이머는 위에서 이미 갱신).
+    if (this.blocked) return;
 
     let budget = this.speed * speedMult * dt;
     while (budget > 0 && !this.reachedBase) {

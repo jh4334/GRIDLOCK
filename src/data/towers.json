@@ -46,6 +46,29 @@
       "projectileSpeed": 650,
       "projectileRadius": 4,
       "projectileColor": "#e18cff"
+    },
+    "barracks": {
+      "name": "배럭",
+      "cost": 100,
+      "range": 0,
+      "fireRate": 0,
+      "damage": 0,
+      "color": "#6d7a8c",
+      "projectileSpeed": 0,
+      "projectileRadius": 0,
+      "projectileColor": "#000000",
+      "barracks": {
+        "soldierCount": 3,
+        "soldierHp": 60,
+        "soldierDamage": 8,
+        "soldierAttackRate": 1,
+        "soldierSpeed": 70,
+        "soldierRadius": 8,
+        "respawnTime": 8,
+        "rallyRadius": 18,
+        "engageRadius": 90,
+        "soldierColor": "#eaf0ff"
+      }
     }
   },
   "upgrade": {

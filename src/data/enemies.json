@@ -4,34 +4,44 @@
     "speed": 90,
     "reward": 8,
     "color": "#7bf77b",
-    "radius": 9
+    "radius": 9,
+    "meleeDamage": 4,
+    "meleeRate": 1
   },
   "grunt": {
     "hp": 60,
     "speed": 60,
     "reward": 10,
     "color": "#5aa9e6",
-    "radius": 12
+    "radius": 12,
+    "meleeDamage": 6,
+    "meleeRate": 1
   },
   "tanker": {
     "hp": 200,
     "speed": 35,
     "reward": 25,
     "color": "#6b5334",
-    "radius": 17
+    "radius": 17,
+    "meleeDamage": 12,
+    "meleeRate": 1
   },
   "swarm": {
     "hp": 15,
     "speed": 75,
     "reward": 5,
     "color": "#e6c86f",
-    "radius": 7
+    "radius": 7,
+    "meleeDamage": 2,
+    "meleeRate": 1
   },
   "boss": {
     "hp": 1500,
     "speed": 30,
     "reward": 150,
     "color": "#a02733",
-    "radius": 22
+    "radius": 22,
+    "meleeDamage": 25,
+    "meleeRate": 1
   }
 }

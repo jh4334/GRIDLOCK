@@ -9,6 +9,20 @@ import { TILE, cellToPixel } from '../game/grid';
 
 export type TowerKind = keyof typeof towersData.towers;
 
+// 배럭 전용 병사 스탯(M10). 투사체를 쏘지 않는 대신 병사를 유지한다.
+export interface BarracksSpec {
+  soldierCount: number; // 유지할 병사 수
+  soldierHp: number;
+  soldierDamage: number;
+  soldierAttackRate: number; // 병사 근접 공속(회/s)
+  soldierSpeed: number; // px/s
+  soldierRadius: number; // px
+  respawnTime: number; // 사망 후 리스폰까지 대기(초)
+  rallyRadius: number; // 집결지 중심 기준 병사 대기 간격(px)
+  engageRadius: number; // 집결지 주변 적 감지·교전 반경(px)
+  soldierColor: string;
+}
+
 export interface TowerSpec {
   name: string;
   cost: number;
@@ -22,6 +36,7 @@ export interface TowerSpec {
   splashRadius?: number; // 캐논 전용
   slowFactor?: number; // 프로스트 전용 — 이속 감소 비율
   slowDuration?: number; // 프로스트 전용 — 초
+  barracks?: BarracksSpec; // 배럭 전용 — 존재하면 투사체 대신 병사 운용(M10)
 }
 
 interface UpgradeRules {
@@ -68,6 +83,11 @@ export class Tower {
     this.cx = cx;
     this.cy = cy;
     this.invested = this.spec.cost;
+  }
+
+  /** 배럭(투사체 미발사)인가 — combat이 발사 대상에서 제외하는 판정(M10). */
+  get isBarracks(): boolean {
+    return this.spec.barracks !== undefined;
   }
 
   // ── 레벨 반영 실효 스탯 ──────────────────────────────────────

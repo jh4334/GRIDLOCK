@@ -25,21 +25,36 @@ export class MouseInput {
 
   // 클릭 콜백(설치/선택용). 좌표는 mousemove와 동일한 보정을 거쳐 넘긴다.
   private clickHandler: ((x: number, y: number) => void) | null = null;
+  // 우클릭 콜백(집결지 지정용, M10). contextmenu 기본 메뉴는 항상 차단한다.
+  private rightClickHandler: ((x: number, y: number) => void) | null = null;
 
-  private readonly onClickEvent = (e: MouseEvent): void => {
-    if (!this.clickHandler) return;
+  // 캔버스 내부 픽셀 좌표로 보정(CSS 확대/축소 반영).
+  private toCanvas(e: MouseEvent): { x: number; y: number } {
     const rect = this.canvas.getBoundingClientRect();
     const scaleX = this.canvas.width / rect.width;
     const scaleY = this.canvas.height / rect.height;
-    const x = (e.clientX - rect.left) * scaleX;
-    const y = (e.clientY - rect.top) * scaleY;
+    return { x: (e.clientX - rect.left) * scaleX, y: (e.clientY - rect.top) * scaleY };
+  }
+
+  private readonly onClickEvent = (e: MouseEvent): void => {
+    if (!this.clickHandler) return;
+    const { x, y } = this.toCanvas(e);
     this.clickHandler(x, y);
+  };
+
+  // 우클릭 — 브라우저 컨텍스트 메뉴를 막고 좌표를 핸들러로 넘긴다.
+  private readonly onContextMenu = (e: MouseEvent): void => {
+    e.preventDefault();
+    if (!this.rightClickHandler) return;
+    const { x, y } = this.toCanvas(e);
+    this.rightClickHandler(x, y);
   };
 
   constructor(private canvas: HTMLCanvasElement) {
     canvas.addEventListener('mousemove', this.onMove);
     canvas.addEventListener('mouseleave', this.onLeave);
     canvas.addEventListener('click', this.onClickEvent);
+    canvas.addEventListener('contextmenu', this.onContextMenu);
   }
 
   /** 캔버스 클릭 핸들러 등록. 좌표는 캔버스 내부 픽셀 좌표로 보정된 값. */
@@ -47,11 +62,17 @@ export class MouseInput {
     this.clickHandler = handler;
   }
 
+  /** 캔버스 우클릭 핸들러 등록(집결지 지정). 보정된 캔버스 내부 좌표를 넘긴다. */
+  onRightClick(handler: (x: number, y: number) => void): void {
+    this.rightClickHandler = handler;
+  }
+
   /** 이벤트 리스너 해제 (현재 미사용, 정리용). */
   dispose(): void {
     this.canvas.removeEventListener('mousemove', this.onMove);
     this.canvas.removeEventListener('mouseleave', this.onLeave);
     this.canvas.removeEventListener('click', this.onClickEvent);
+    this.canvas.removeEventListener('contextmenu', this.onContextMenu);
   }
 
   get x(): number {

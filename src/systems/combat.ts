@@ -54,6 +54,7 @@ export class CombatSystem {
   // 타워별 쿨다운 감소 → 준비되면 사거리 내 가장 앞선 적에게 발사.
   private fireTowers(dt: number, towers: Tower[], enemies: Enemy[], field: FlowField): void {
     for (const t of towers) {
+      if (t.isBarracks) continue; // 배럭은 투사체를 쏘지 않는다(M10).
       if (t.cooldown > 0) t.cooldown -= dt;
       if (t.cooldown > 0) continue;
 

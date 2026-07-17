@@ -7,10 +7,11 @@
 
 import type { MouseInput } from '../core/input';
 import type { Grid } from './grid';
-import { TILE, cellToPixel, pixelToCell } from './grid';
+import { TILE, cellToPixel, cellCenter, pixelToCell } from './grid';
 import type { Economy } from './economy';
 import type { Enemy } from '../entities/enemy';
 import { Tower, towerSpec, TowerKind, TOWER_INSET } from '../entities/tower';
+import { Barracks } from '../entities/unit';
 import { isCellPlaceable, isPathClear } from '../systems/placement';
 import type { BuildMenu } from '../ui/buildMenu';
 import economyData from '../data/economy.json';
@@ -80,13 +81,34 @@ export class Interaction {
 
   private selectTower(t: Tower): void {
     this.selectedTower = t;
+    this.lastPanelSig = ''; // 새 선택 — 다음 updatePanel이 반드시 다시 그리도록.
     this.showPanel();
   }
 
   private deselect(): void {
     if (!this.selectedTower) return;
     this.selectedTower = null;
+    this.lastPanelSig = '';
     this.deps.buildMenu.showTowerPanel(null);
+  }
+
+  /** 현재 설치된 배럭 목록(melee 시스템·병사 렌더용). 타워 수가 적어 매 프레임 필터해도 저렴. */
+  get barracks(): Barracks[] {
+    return this.towers.filter((t): t is Barracks => t instanceof Barracks);
+  }
+
+  /**
+   * 우클릭 — 선택된 배럭의 집결지를 클릭 칸으로 이동(M10). 도착점이 통행 불가(벽/타워)면 거부.
+   * 경로는 단순 직선 이동 허용(A*는 M11). 배럭 미선택이면 무시.
+   */
+  handleRightClick(px: number, py: number): void {
+    const sel = this.selectedTower;
+    if (!(sel instanceof Barracks)) return;
+    const { cx, cy } = pixelToCell(px, py);
+    if (!this.deps.grid.inBounds(cx, cy)) return;
+    if (!this.deps.grid.isWalkable(cx, cy)) return; // 벽/타워 칸이면 거부.
+    const c = cellCenter(cx, cy);
+    sel.setRally(c.x, c.y);
   }
 
   private refundOf(t: Tower): number {
@@ -101,6 +123,17 @@ export class Interaction {
       return;
     }
     const cost = t.upgradeCost;
+    // 배럭은 공격력/사거리/공속 대신 병사 수·리스폰·병사 스탯을 보여준다(M10).
+    const soldier =
+      t instanceof Barracks
+        ? {
+            alive: t.aliveCount,
+            count: t.bspec.soldierCount,
+            respawning: t.respawningCount,
+            hp: Math.round(t.soldierMaxHp),
+            damage: Math.round(t.soldierDamage * 10) / 10,
+          }
+        : undefined;
     this.deps.buildMenu.showTowerPanel({
       name: t.spec.name,
       level: t.level,
@@ -108,6 +141,7 @@ export class Interaction {
       damage: Math.round(t.effectiveDamage * 10) / 10, // 소수 1자리.
       range: Math.round(t.effectiveRange),
       fireRate: t.spec.fireRate,
+      soldier,
       upgradeCost: cost,
       canAffordUpgrade: cost !== null && this.deps.economy.gold >= cost,
       refund: this.refundOf(t),
@@ -117,6 +151,18 @@ export class Interaction {
   /** 골드 변동 시 Game이 호출 — 선택 중이면 업그레이드 버튼 활성 여부를 다시 반영한다. */
   refreshPanel(): void {
     if (this.selectedTower) this.showPanel();
+  }
+
+  // 배럭 선택 시 병사 수/리스폰이 실시간으로 바뀌므로, 표시값이 변할 때만 패널을 다시 그린다
+  // (매 프레임 DOM 재생성·버튼 깜빡임 방지). Game이 프레임당 1회 호출.
+  private lastPanelSig = '';
+  updatePanel(): void {
+    const t = this.selectedTower;
+    if (!(t instanceof Barracks)) return;
+    const sig = `${t.level}|${t.aliveCount}|${t.respawningCount}|${this.deps.economy.gold}`;
+    if (sig === this.lastPanelSig) return;
+    this.lastPanelSig = sig;
+    this.showPanel();
   }
 
   /** 선택된 타워를 한 단계 업그레이드(골드 충분 + 최대 레벨 미만일 때만). */
@@ -162,7 +208,9 @@ export class Interaction {
     }
 
     economy.spend(spec.cost);
-    this.towers.push(new Tower(kind, cx, cy));
+    // 배럭도 벽(경로 차단) — 일반 타워와 같은 봉쇄 검사를 거쳐 'tower'로 설치된다.
+    const tower = kind === 'barracks' ? new Barracks(cx, cy, grid) : new Tower(kind, cx, cy);
+    this.towers.push(tower);
     grid.setState(cx, cy, 'tower');
     this.deps.recomputeField(); // 설치 즉시 필드 재계산 + 전 적 reroute.
 
@@ -215,6 +263,7 @@ export class Interaction {
     this.ghost = null;
     this.flash = null;
     this.hoverCell = null;
+    this.lastPanelSig = '';
     this.deps.buildMenu.setActiveTower(null);
     this.deps.buildMenu.showTowerPanel(null);
   }
@@ -228,8 +277,17 @@ export class Interaction {
 
   renderTowers(ctx: CanvasRenderingContext2D): void {
     for (const t of this.towers) t.render(ctx, t === this.selectedTower);
-    // 선택된 타워의 실효 사거리 원은 타워 위에 덧그린다.
-    if (this.selectedTower) this.selectedTower.renderRange(ctx);
+    // 선택된 타워의 실효 사거리 원은 타워 위에 덧그린다(배럭은 사거리 0이라 원이 없다).
+    if (this.selectedTower && !(this.selectedTower instanceof Barracks)) {
+      this.selectedTower.renderRange(ctx);
+    }
+  }
+
+  /** 병사 + (배럭 선택 시)집결지 마커 렌더 — 적 위 레이어에 그린다(Game.render가 조율). */
+  renderUnits(ctx: CanvasRenderingContext2D): void {
+    for (const b of this.barracks) for (const s of b.soldiers) s.render(ctx);
+    const sel = this.selectedTower;
+    if (sel instanceof Barracks) sel.renderRally(ctx);
   }
 
   renderFlash(ctx: CanvasRenderingContext2D): void {
