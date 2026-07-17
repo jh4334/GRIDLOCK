@@ -34,6 +34,9 @@ const FILES = [
   'tileGrass1', 'tileGrass2', 'tileSand1', 'tileSand2', 'tracksDouble',
   'flagRed1', 'flagGreen1', 'flagYellow1', 'gemGreen', 'gemBlue', 'gold_3',
   'laserBlue01', 'laserRed01', 'meteorGrey_tiny1',
+  // 동적 도로 경로(디펜스) — 가로/세로 직선 + 코너 4종.
+  'tileGrass_roadEast', 'tileGrass_roadNorth',
+  'tileGrass_roadCornerUL', 'tileGrass_roadCornerUR', 'tileGrass_roadCornerLL', 'tileGrass_roadCornerLR',
 ];
 
 function loadImage(name: string): Promise<Img> {
@@ -206,6 +209,14 @@ function applySkin(I: Record<string, Img>): void {
   setSprite('tile/floor/grass2', bakeTile(I['tileGrass2'], S));
   setSprite('tile/floor/sand1', bakeTile(I['tileSand1'], S));
   setSprite('tile/floor/sand2', bakeTile(I['tileSand2'], S));
+
+  // 동적 도로 경로 타일 — 바닥 타일과 동일하게 48px + TILE_DIM 틴트로 구움.
+  setSprite('tile/road/h', bakeTile(I['tileGrass_roadEast'], S));
+  setSprite('tile/road/v', bakeTile(I['tileGrass_roadNorth'], S));
+  setSprite('tile/road/ul', bakeTile(I['tileGrass_roadCornerUL'], S));
+  setSprite('tile/road/ur', bakeTile(I['tileGrass_roadCornerUR'], S));
+  setSprite('tile/road/ll', bakeTile(I['tileGrass_roadCornerLL'], S));
+  setSprite('tile/road/lr', bakeTile(I['tileGrass_roadCornerLR'], S));
 
   buildProjectiles(I);
 }

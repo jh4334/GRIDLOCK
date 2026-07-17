@@ -27,6 +27,7 @@ import { UnitSelection } from './unitSelection';
 import { bindGameInput } from './gameInput';
 import { GameFlow } from './flow';
 import { renderDefense } from './gameRender';
+import { computeRoadCells, type RoadPiece } from '../render/roadPath';
 import type { BestRecord } from '../core/storage';
 
 // 배속 옵션(구조 상수 — 서브스텝 반복 횟수). 밸런스 수치 아님.
@@ -60,6 +61,7 @@ export class Game {
   private readonly flow: GameFlow; // menu/playing/won/lost 상태머신 + 최고기록 소유.
 
   private flowField: FlowField;
+  private roadCells: RoadPiece[] = []; // 적이 따르는 스폰→기지 최단 경로의 도로 조각(recomputeField에서 갱신).
   private enemies: Enemy[] = [];
   private speed = 1; // 배속(서브스텝 반복 횟수). update가 게임 월드를 이 횟수만큼 갱신.
   private showFlowDebug = false;
@@ -76,6 +78,7 @@ export class Game {
     this.ctx = ctx;
     this.input = new MouseInput(canvas);
     this.flowField = computeFlowField(this.grid);
+    this.roadCells = computeRoadCells(this.flowField);
     this.lastGold = this.economy.gold;
 
     // 세 번째 인자 isActive: 정복 모드·타이틀에서 숫자키 스폰이 새지 않도록 격리.
@@ -196,6 +199,7 @@ export class Game {
   // 필드 재계산 후 살아있는 적 전원 재경로(DESIGN.md 함정 리스트 5번).
   private recomputeField(): void {
     this.flowField = computeFlowField(this.grid);
+    this.roadCells = computeRoadCells(this.flowField); // 도로 경로도 함께 재배치(순수 렌더).
     for (const e of this.enemies) e.reroute(this.flowField);
   }
 
@@ -277,9 +281,8 @@ export class Game {
 
   render(): void {
     renderDefense(this.ctx, {
-      canvas: this.canvas,
-      shake: this.shake,
-      grid: this.grid,
+      canvas: this.canvas, shake: this.shake,
+      grid: this.grid, roadCells: this.roadCells,
       showFlowDebug: this.showFlowDebug,
       flowField: this.flowField,
       interaction: this.interaction,
@@ -291,8 +294,7 @@ export class Game {
       hud: this.hud,
       economy: this.economy,
       waveManager: this.waveManager,
-      flow: this.flow,
-      fps: this.fps,
+      flow: this.flow, fps: this.fps,
     });
   }
 }

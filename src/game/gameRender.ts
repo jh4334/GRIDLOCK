@@ -4,6 +4,7 @@
 // 읽기 전용(상태 변경 없음) — Game.render가 자신의 참조들을 넘겨 호출한다.
 
 import { renderFlowField } from '../debug/flowField';
+import { renderRoad, type RoadPiece } from '../render/roadPath';
 import { renderHitboxes } from '../debug/cheats';
 import { renderOverlay } from '../ui/overlay';
 import type { Grid } from './grid';
@@ -24,6 +25,7 @@ export interface DefenseRenderParts {
   canvas: HTMLCanvasElement;
   shake: ScreenShake;
   grid: Grid;
+  roadCells: RoadPiece[];
   showFlowDebug: boolean;
   flowField: FlowField;
   interaction: Interaction;
@@ -47,6 +49,7 @@ export function renderDefense(ctx: CanvasRenderingContext2D, p: DefenseRenderPar
   if (p.shake.active) ctx.translate(p.shake.x, p.shake.y);
 
   p.grid.render(ctx);
+  renderRoad(ctx, p.roadCells); // 바닥 바로 위 — 적이 따르는 현재 최단 경로를 도로 타일로.
   if (p.showFlowDebug) renderFlowField(ctx, p.flowField);
 
   p.interaction.renderHoverOrGhost(ctx);
