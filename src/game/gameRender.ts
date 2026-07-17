@@ -70,10 +70,10 @@ export function renderDefense(ctx: CanvasRenderingContext2D, p: DefenseRenderPar
 
   if (p.showHitbox) renderHitboxes(ctx, p.enemies, p.interaction.towers); // H 치트.
 
-  p.hud.render(ctx, p.economy, { current: p.waveManager.current, total: p.waveManager.total });
+  p.hud.render(ctx, p.economy, { current: p.waveManager.current, total: p.waveManager.total, endless: p.waveManager.isEndless });
   p.interaction.renderToast(ctx); // 설치 불가 사유 토스트는 HUD 위, 오버레이 아래(D2.1).
   // 승리/패배 오버레이는 HUD 위, FPS 아래로 그린다.
-  renderOverlay(ctx, p.flow.state, p.waveManager.current, p.waveManager.total, p.flow.best);
+  renderOverlay(ctx, p.flow.state, p.waveManager.current, p.waveManager.total, p.flow.best, p.waveManager.isEndless);
   p.fps.render(ctx);
 
   ctx.restore();

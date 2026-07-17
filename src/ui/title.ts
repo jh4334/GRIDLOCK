@@ -81,7 +81,12 @@ export function formatBest(best: BestRecord | null): string {
   return `최고 기록: ${wavePart} (라이프 ${best.lives})`;
 }
 
-export function renderTitle(ctx: CanvasRenderingContext2D, best: BestRecord | null, difficulty: DifficultyId): void {
+export function renderTitle(
+  ctx: CanvasRenderingContext2D,
+  best: BestRecord | null,
+  difficulty: DifficultyId,
+  endlessBest = 0, // 엔드리스 최고 도달 웨이브(0이면 표시 안 함, D4.3).
+): void {
   const w = ctx.canvas.width;
   const h = ctx.canvas.height;
 
@@ -121,6 +126,13 @@ export function renderTitle(ctx: CanvasRenderingContext2D, best: BestRecord | nu
   ctx.fillStyle = COLOR_BEST;
   ctx.font = '18px monospace';
   ctx.fillText(formatBest(best), w / 2, h * 0.86);
+
+  // 엔드리스 최고 웨이브(기록이 있을 때만) — 디펜스 최고기록 바로 아래.
+  if (endlessBest > 0) {
+    ctx.fillStyle = COLOR_NEON_CONQUEST;
+    ctx.font = '15px monospace';
+    ctx.fillText(`엔드리스 최고: 웨이브 ${endlessBest}`, w / 2, h * 0.86 + 26);
+  }
 
   ctx.restore();
 }

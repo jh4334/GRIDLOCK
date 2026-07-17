@@ -64,6 +64,37 @@ export function updateBest(candidate: BestRecord): BestRecord {
   return prev as BestRecord; // isBetter가 false면 prev는 non-null.
 }
 
+// ── 엔드리스 최고 웨이브(D4.3) ────────────────────────────────────
+// 엔드리스 모드에서 도달한 최고 웨이브를 gridlock.endless에 정수로 저장·복원한다.
+// 디펜스 최고기록(gridlock.best)과는 별개 키 — 엔드리스는 클리어가 없고 도달 웨이브만 의미가 있다.
+// 값이 없거나 손상/예외면 0(기록 없음).
+
+const ENDLESS_KEY = 'gridlock.endless';
+
+/** 저장된 엔드리스 최고 웨이브를 읽는다. 없거나 손상/예외면 0. */
+export function loadEndlessBest(): number {
+  try {
+    const raw = localStorage.getItem(ENDLESS_KEY);
+    if (!raw) return 0;
+    const n = Number(raw);
+    return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
+  } catch {
+    return 0;
+  }
+}
+
+/** 도달 웨이브가 기존 기록보다 크면 저장하고, 최종 최고 웨이브를 반환. */
+export function updateEndlessBest(wave: number): number {
+  const prev = loadEndlessBest();
+  if (wave <= prev) return prev;
+  try {
+    localStorage.setItem(ENDLESS_KEY, String(wave));
+  } catch {
+    // 저장 실패는 게임 진행에 영향 없음 — 무시.
+  }
+  return wave;
+}
+
 // ── 사운드 옵션(D2.6) ─────────────────────────────────────────────
 // 음량(0~1)·음소거를 gridlock.audio에 저장·복원한다(loadBest와 동일한 try/catch 패턴).
 

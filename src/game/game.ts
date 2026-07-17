@@ -31,8 +31,7 @@ import { renderDefense } from './gameRender';
 import { computeRoadCells, type RoadPiece } from '../render/roadPath';
 import type { BestRecord } from '../core/storage';
 
-// 배속 옵션(구조 상수 — 서브스텝 반복 횟수). 밸런스 수치 아님.
-const SPEEDS = [1, 2, 3];
+const SPEEDS = [1, 2, 3]; // 배속 옵션(구조 상수 — 서브스텝 반복 횟수). 밸런스 수치 아님.
 
 // App(모드 조율자)이 주입하는 콜백 — 타이틀 복귀 시 App이 디펜스 모드를 정리한다.
 export interface GameDeps {
@@ -110,6 +109,7 @@ export class Game {
       onNextWave: () => this.startNextWave(),
       onSetSpeed: (s) => this.setSpeed(s),
       onRestart: () => this.flow.restart(),
+      onEndless: () => this.flow.continueEndless(), // 20웨이브 승리 → 엔드리스 계속(D4.3).
       onToTitle: () => this.deps.onExit(), // 타이틀 복귀는 App이 정리(deactivate)한다.
     });
     this.controls.setActiveSpeed(this.speed);
@@ -184,6 +184,7 @@ export class Game {
   get best(): BestRecord | null {
     return this.flow.best;
   }
+  get endlessBest(): number { return this.flow.endlessBest; } // 엔드리스 최고 웨이브(타이틀 표시, D4.3).
 
   /** 정복→디펜스 진입 — 월드 초기화 + 게임 시작(menu→playing). App이 호출. */
   activate(): void {
@@ -280,6 +281,7 @@ export class Game {
     this.controls.setNextWaveEnabled(state === 'playing' && this.waveManager.canStart);
     this.controls.setWaveInProgress(this.waveManager.inProgress); // 진행 상태를 DOM에 반영(E2E 관찰용).
     this.controls.showRestart(state === 'won' || state === 'lost'); // menu는 바 자체가 숨김.
+    this.controls.setEndlessVisible(state === 'won'); // 엔드리스 계속 버튼은 승리 시에만(D4.3).
   }
 
   render(): void {

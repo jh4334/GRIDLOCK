@@ -5,6 +5,7 @@ import type { Economy } from '../game/economy';
 export interface WaveInfo {
   current: number;
   total: number;
+  endless: boolean; // 엔드리스 모드면 "웨이브 n (엔드리스)"로 표기(D4.3).
 }
 
 export class Hud {
@@ -22,7 +23,8 @@ export class Hud {
     ctx.fillText(`라이프 ${economy.lives}`, right, 28);
 
     ctx.fillStyle = '#9ad0ff';
-    ctx.fillText(`웨이브 ${wave.current}/${wave.total}`, right, 48);
+    const waveText = wave.endless ? `웨이브 ${wave.current} (엔드리스)` : `웨이브 ${wave.current}/${wave.total}`;
+    ctx.fillText(waveText, right, 48);
 
     ctx.restore();
   }

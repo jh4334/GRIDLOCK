@@ -5,6 +5,10 @@
     "goldPerRemainingSecond": 1,
     "maxBonus": 20
   },
+  "endless": {
+    "hpScaleAccel": 1.03,
+    "rewardScale": 0.9
+  },
   "waves": [
     [
       {

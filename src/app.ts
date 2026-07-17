@@ -86,6 +86,6 @@ export class App {
   private render(): void {
     if (this.mode === 'defense') this.game.render();
     else if (this.mode === 'conquest') this.conquest.render();
-    else renderTitle(this.ctx, this.game.best, this.difficulty); // 타이틀(최고기록 + 정복 난이도 선택).
+    else renderTitle(this.ctx, this.game.best, this.difficulty, this.game.endlessBest); // 타이틀(최고기록 + 엔드리스 기록 + 난이도).
   }
 }

@@ -63,6 +63,7 @@ const TOTAL_WAVES = wavesData.totalWaves;
 export class WaveManager {
   private active: ActiveWave[] = []; // 진행 중(아직 완료 처리 전) 웨이브들의 독립 큐.
   private startedCount = 0; // 지금까지 시작된 최고 웨이브 번호(순차 시작이라 곧 마지막 시작 웨이브). 0 = 시작 전.
+  private endless = false; // 엔드리스 모드(D4.3) — totalWaves 이후 무한 진행. 승리 판정 없이 패배만.
 
   constructor(private cb: WaveCallbacks) {}
 
@@ -73,13 +74,22 @@ export class WaveManager {
   get total(): number {
     return TOTAL_WAVES;
   }
+  /** 엔드리스 모드 여부(HUD 표기·최고 웨이브 기록 판단용). */
+  get isEndless(): boolean {
+    return this.endless;
+  }
   /** 진행 중인 웨이브가 하나라도 있는가(다음 웨이브 버튼의 진행 표시용). */
   get inProgress(): boolean {
     return this.active.length > 0;
   }
-  /** 다음 웨이브 버튼 활성 조건: 남은 웨이브가 있으면 진행 중이라도 활성(중첩 허용). */
+  /** 다음 웨이브 버튼 활성 조건: 남은 웨이브가 있으면 진행 중이라도 활성(중첩 허용). 엔드리스는 항상 활성. */
   get canStart(): boolean {
-    return this.startedCount < TOTAL_WAVES;
+    return this.endless || this.startedCount < TOTAL_WAVES;
+  }
+
+  /** 엔드리스 모드 진입(D4.3) — 20웨이브 승리 후 "엔드리스 계속" 시. 이후 승리 재판정 없음. */
+  enterEndless(): void {
+    this.endless = true;
   }
 
   /**
@@ -89,7 +99,7 @@ export class WaveManager {
    */
   nextWaveComposition(): WaveComposition[] {
     const next = this.startedCount + 1;
-    if (next > TOTAL_WAVES) return [];
+    if (next > TOTAL_WAVES && !this.endless) return []; // 엔드리스에선 절차 생성 구성을 프리뷰로 노출.
     const totals = new Map<EnemyKind, number>();
     for (const g of groupsForWave(next)) totals.set(g.kind, (totals.get(g.kind) ?? 0) + g.count);
     return [...totals].map(([kind, count]) => ({ kind, count }));
@@ -140,7 +150,7 @@ export class WaveManager {
 
     for (const w of this.active) {
       w.elapsed += dt;
-      const mult = Math.pow(wavesData.hpScalePerWave, w.waveNumber - 1);
+      const mult = hpMultiplier(w.waveNumber);
       while (w.nextIndex < w.schedule.length && w.schedule[w.nextIndex].time <= w.elapsed) {
         this.cb.spawn(w.schedule[w.nextIndex].kind, mult);
         w.nextIndex += 1;
@@ -164,24 +174,35 @@ export class WaveManager {
   }
 
   // 진행 중인 모든 웨이브를 일괄 완료 처리 — 웨이브별 클리어 보너스 지급, 마지막 웨이브 포함 시 승리.
+  // 엔드리스 구간(웨이브 > totalWaves) 보상은 rewardScale로 감쇠하고, 엔드리스에선 승리 재판정 없음.
   private completeAll(): void {
     let maxWave = 0;
     for (const w of this.active) {
-      const bonus = economyData.waveClearBase + economyData.waveClearPerWave * w.waveNumber;
+      let bonus = economyData.waveClearBase + economyData.waveClearPerWave * w.waveNumber;
+      if (w.waveNumber > TOTAL_WAVES) bonus = Math.floor(bonus * wavesData.endless.rewardScale);
       this.cb.onWaveClear(w.waveNumber, bonus);
       maxWave = Math.max(maxWave, w.waveNumber);
     }
     this.active = [];
     this.cb.onWaveChange?.();
-    if (maxWave >= TOTAL_WAVES) this.cb.onVictory();
+    if (!this.endless && maxWave >= TOTAL_WAVES) this.cb.onVictory();
   }
 
-  /** 재시작 — 웨이브 진행 상태를 초기화한다. */
+  /** 재시작 — 웨이브 진행 상태를 초기화한다(엔드리스 모드도 해제). */
   reset(): void {
     this.active = [];
     this.startedCount = 0;
+    this.endless = false;
     this.cb.onWaveChange?.();
   }
+}
+
+// 웨이브 번호 → HP 배율. 기본은 hpScalePerWave^(n-1). 엔드리스 구간(n>totalWaves)은
+// 웨이브당 endless.hpScaleAccel을 누진해 곱한다(가속 — 후반부일수록 더 가파르게).
+function hpMultiplier(n: number): number {
+  let mult = Math.pow(wavesData.hpScalePerWave, n - 1);
+  if (n > TOTAL_WAVES) mult *= Math.pow(wavesData.endless.hpScaleAccel, n - TOTAL_WAVES);
+  return mult;
 }
 
 // ── 스케줄/조합 생성 ───────────────────────────────────────────────

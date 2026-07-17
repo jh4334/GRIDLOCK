@@ -7,7 +7,7 @@
 // update(dt)/render(ctx) 분리 규칙 유지 — 여기엔 렌더 로직이 없고 상태 전이만 담당한다.
 
 import type { GameState } from './state';
-import { type BestRecord, loadBest, updateBest } from '../core/storage';
+import { type BestRecord, loadBest, updateBest, loadEndlessBest, updateEndlessBest } from '../core/storage';
 import type { Economy } from './economy';
 import type { Grid } from './grid';
 import type { Interaction } from './interaction';
@@ -37,6 +37,7 @@ export interface FlowDeps {
 export class GameFlow {
   private _state: GameState = 'menu'; // 부팅 즉시 타이틀 화면(M9).
   private _best: BestRecord | null = loadBest(); // localStorage 최고기록(타이틀·승패 화면 표시).
+  private _endlessBest = loadEndlessBest(); // 엔드리스 최고 도달 웨이브(D4.3, 0 = 기록 없음).
 
   constructor(private deps: FlowDeps) {
     this.setGameplayUiVisible(false); // menu 상태 — 게임 UI(빌드 메뉴·컨트롤 바)는 숨긴 채 시작.
@@ -47,6 +48,10 @@ export class GameFlow {
   }
   get best(): BestRecord | null {
     return this._best;
+  }
+  /** 엔드리스 최고 도달 웨이브(타이틀 표시용). 0이면 기록 없음. */
+  get endlessBest(): number {
+    return this._endlessBest;
   }
 
   // 타이틀 → 게임 시작(클릭/Space). 월드 초기화 + 게임 UI 노출.
@@ -80,10 +85,23 @@ export class GameFlow {
     this.record(true);
   }
 
-  // 패배 확정(라이프 0). 최고기록 갱신.
+  // 승리(20웨이브) 후 "엔드리스 계속" — 월드는 그대로 두고(타워·골드·라이프 유지) 21웨이브부터
+  // 이어서 진행한다. WaveManager를 엔드리스로 전환하고 곧장 다음 웨이브를 시작한다(승리 재판정 없음).
+  continueEndless(): void {
+    if (this._state !== 'won') return;
+    this._state = 'playing';
+    this.deps.controls.showRestart(false); // 승리 오버레이 버튼(엔드리스/다시 시작/타이틀) 숨김.
+    this.deps.waveManager.enterEndless();
+    this.deps.waveManager.startNextWave(); // 21웨이브 시작(승리 직후라 필드 적 0 → 얼리콜 보너스 없음).
+  }
+
+  // 패배 확정(라이프 0). 최고기록 갱신 + 엔드리스면 도달 웨이브를 별도 기록.
   lose(): void {
     this._state = 'lost';
     this.record(false);
+    if (this.deps.waveManager.isEndless) {
+      this._endlessBest = updateEndlessBest(this.deps.waveManager.current);
+    }
   }
 
   // 승/패 확정 시 최고기록 갱신. 승리는 총 웨이브 클리어, 패배는 도달 웨이브 기준.

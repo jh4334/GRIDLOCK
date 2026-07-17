@@ -18,6 +18,7 @@ export function renderOverlay(
   reachedWave: number,
   totalWaves: number,
   best: BestRecord | null,
+  endless = false, // 엔드리스 모드면 패배 문구를 "엔드리스 도달 웨이브 n"으로(D4.3).
 ): void {
   if (state !== 'won' && state !== 'lost') return;
 
@@ -38,7 +39,11 @@ export function renderOverlay(
 
   ctx.fillStyle = COLOR_SUB;
   ctx.font = '22px system-ui, sans-serif';
-  const sub = won ? `${totalWaves}웨이브 클리어` : `도달 웨이브 ${reachedWave}/${totalWaves}`;
+  const sub = won
+    ? `${totalWaves}웨이브 클리어`
+    : endless
+      ? `엔드리스 도달 웨이브 ${reachedWave}`
+      : `도달 웨이브 ${reachedWave}/${totalWaves}`;
   ctx.fillText(sub, w / 2, h / 2 + 28);
 
   // 최고기록(타이틀 화면과 동일 포맷).
