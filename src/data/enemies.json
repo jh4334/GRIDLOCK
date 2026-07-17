@@ -1,0 +1,7 @@
+{
+  "runner": { "hp": 30, "speed": 90, "reward": 8, "color": "#7bf77b", "radius": 9 },
+  "grunt": { "hp": 60, "speed": 60, "reward": 10, "color": "#5aa9e6", "radius": 12 },
+  "tanker": { "hp": 200, "speed": 35, "reward": 25, "color": "#6b5334", "radius": 17 },
+  "swarm": { "hp": 15, "speed": 75, "reward": 4, "color": "#e6c86f", "radius": 7 },
+  "boss": { "hp": 1500, "speed": 30, "reward": 150, "color": "#a02733", "radius": 22 }
+}

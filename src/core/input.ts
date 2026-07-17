@@ -46,3 +46,28 @@ export class MouseInput {
     return this.inside;
   }
 }
+
+// 키보드 입력 — 키별 keydown 핸들러를 등록한다. 키 자동 반복(e.repeat)은
+// 무시해 D 토글 같은 동작이 누르고 있는 동안 연타되지 않게 한다.
+export class Keyboard {
+  private handlers = new Map<string, () => void>();
+
+  private readonly onKeyDown = (e: KeyboardEvent): void => {
+    if (e.repeat) return;
+    const fn = this.handlers.get(e.key.toLowerCase());
+    if (fn) fn();
+  };
+
+  constructor() {
+    window.addEventListener('keydown', this.onKeyDown);
+  }
+
+  /** key는 대소문자 무관('d', 'D' 동일). 같은 키 재등록 시 덮어쓴다. */
+  on(key: string, handler: () => void): void {
+    this.handlers.set(key.toLowerCase(), handler);
+  }
+
+  dispose(): void {
+    window.removeEventListener('keydown', this.onKeyDown);
+  }
+}
