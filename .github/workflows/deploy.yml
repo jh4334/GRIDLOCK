@@ -28,6 +28,10 @@ jobs:
       - run: npm ci
       - run: npm run build
       - uses: actions/configure-pages@v5
+        with:
+          # Pages 사이트가 아직 없으면 워크플로가 직접 활성화한다(수동 Settings 클릭 불요).
+          # 단, private 레포는 무료 플랜에서 Pages 불가 — 레포를 public으로 전환해야 동작.
+          enablement: true
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
