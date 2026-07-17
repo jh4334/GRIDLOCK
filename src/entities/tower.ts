@@ -73,6 +73,9 @@ export class Tower {
   // 마지막으로 조준한 방향(rad). combat이 매 프레임 사거리 내 대상 방향으로 갱신하고,
   // render는 포탑을 이 각도로 회전시킨다(update/render 분리). 기본 0 = 기지(오른쪽) 방향.
   aimAngle = 0;
+  // 발사 반동 진행도(0~1). 발사 순간 1로 세팅되고 combat.update가 매 프레임 감쇠시킨다.
+  // render는 이 값으로 포신 후퇴 오프셋을 계산한다(update/render 분리).
+  recoil = 0;
 
   constructor(kind: TowerKind, cx: number, cy: number) {
     this.kind = kind;
@@ -126,7 +129,7 @@ export class Tower {
   // 렌더는 상태를 읽기만 한다(변경 없음). 베이스+회전 포탑 스프라이트 + 레벨 마커 + 선택 링.
   render(ctx: CanvasRenderingContext2D, selected: boolean): void {
     const { x, y } = cellToPixel(this.cx, this.cy);
-    drawTower(ctx, this.kind as TowerVisualKind, this.level, x + TILE / 2, y + TILE / 2, this.aimAngle);
+    drawTower(ctx, this.kind as TowerVisualKind, this.level, x + TILE / 2, y + TILE / 2, this.aimAngle, this.recoil);
     if (selected) drawSelectRing(ctx, x, y);
   }
 

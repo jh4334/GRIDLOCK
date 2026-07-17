@@ -13,6 +13,7 @@
 import { TILE } from '../game/grid';
 import { createSpriteCanvas, setSprite, markAssetsReady } from './sprites';
 import { ALLY_CYAN, FOE_RED } from './palette';
+import { DECAL_KEY, DECAL_SIZE } from './decals';
 
 type Img = HTMLImageElement;
 type Canvas = HTMLCanvasElement;
@@ -31,7 +32,7 @@ const FILES = [
   'tankBlue_barrel1_outline', 'tankBlue_barrel2_outline', 'tankBlue_barrel3_outline',
   'tankDark_barrel1_outline', 'tankDark_barrel2_outline', 'tankDark_barrel3_outline',
   'tank_blue', 'tank_red', 'tank_green', 'tank_sand',
-  'tileGrass1', 'tileGrass2', 'tileSand1', 'tileSand2', 'tracksDouble',
+  'tileGrass1', 'tileGrass2', 'tileSand1', 'tileSand2', 'tracksDouble', 'tracksSmall',
   'flagRed1', 'flagGreen1', 'flagYellow1', 'gemGreen', 'gemBlue', 'gold_3',
   'laserBlue01', 'laserRed01', 'meteorGrey_tiny1',
   // 동적 도로 경로(디펜스) — 가로/세로 직선 + 코너 4종.
@@ -144,6 +145,20 @@ function emptyCanvas(): Canvas {
   return createSpriteCanvas(1, 1).canvas; // 회전 링 등 벡터 연출 제거용(투명 1px).
 }
 
+// 잔해 데칼 스탬프 — tracksSmall을 DECAL_SIZE에 맞춰 그린 뒤, 불투명 픽셀에만 어두운 색을
+// 덧입혀(source-atop) "굽는다". 매 프레임 재틴트 없이 이 캔버스를 그대로 drawImage한다(D2.5).
+function bakeDecal(img: Img): Canvas {
+  const { canvas, ctx } = createSpriteCanvas(DECAL_SIZE, DECAL_SIZE);
+  const f = fit(img, DECAL_SIZE);
+  const w = img.width * f;
+  const h = img.height * f;
+  ctx.drawImage(img, (DECAL_SIZE - w) / 2, (DECAL_SIZE - h) / 2, w, h);
+  ctx.globalCompositeOperation = 'source-atop';
+  ctx.fillStyle = 'rgba(6, 8, 12, 0.72)';
+  ctx.fillRect(0, 0, DECAL_SIZE, DECAL_SIZE);
+  return canvas;
+}
+
 // 타워 종류별: 차체(베이스) + 포신(레벨 1/2/3). 포신 f는 차체 f와 동일하게 맞춘다.
 const TOWERS: Array<[string, string, string]> = [
   ['arrow', 'tankBody_green_outline', 'tankGreen_barrel'],
@@ -217,6 +232,9 @@ function applySkin(I: Record<string, Img>): void {
   setSprite('tile/road/ur', bakeTile(I['tileGrass_roadCornerUR'], S));
   setSprite('tile/road/ll', bakeTile(I['tileGrass_roadCornerLL'], S));
   setSprite('tile/road/lr', bakeTile(I['tileGrass_roadCornerLR'], S));
+
+  // 적 사망 잔해 데칼 — 어둡게 구운 궤적 스탬프로 벡터 폴백(어두운 원)을 교체.
+  setSprite(DECAL_KEY, bakeDecal(I['tracksSmall']));
 
   buildProjectiles(I);
 }

@@ -1,6 +1,5 @@
 // 게임 조립·조율. main.ts는 부트스트랩만 하고, 상태 소유와 update/render 조율은 여기서 한다.
-// 설치/판매/선택/호버/고스트/거부 플래시 상호작용은 game/interaction.ts로 분리했고(M5),
-// Game이 소유·조율한다.
+// 설치/판매/선택/호버/고스트/거부 플래시 상호작용은 game/interaction.ts로 분리했다(M5).
 
 import { MouseInput, Keyboard } from '../core/input';
 import { FpsCounter } from '../debug/fps';
@@ -14,6 +13,8 @@ import { createBattleSystems } from './battleSystems';
 import { EffectsSystem } from '../systems/effects';
 import { AudioEngine } from '../core/audio';
 import { ScreenShake } from './screenShake';
+import { DecalField } from '../render/decals';
+import { Vignette } from '../render/vignette';
 import { Enemy, createEnemy } from '../entities/enemy';
 import { towerSpec, TowerKind } from '../entities/tower';
 import towersData from '../data/towers.json';
@@ -54,6 +55,8 @@ export class Game {
   private readonly effects = new EffectsSystem();
   private readonly audio = new AudioEngine();
   private readonly shake = new ScreenShake();
+  private readonly decals = new DecalField(); // 적 사망 잔해 데칼(D2.5) — 월드 시간 기반 페이드.
+  private readonly vignette = new Vignette(); // 기지 피격 붉은 비네트(D2.5) — 실시간 페이드.
   private readonly controls: Controls;
   private readonly waveManager: WaveManager;
   private readonly interaction: Interaction;
@@ -85,7 +88,7 @@ export class Game {
     this.spawner = new DebugSpawner(this.keyboard, (kind) => this.enemies.push(createEnemy(kind, this.flowField)), () => this.active);
 
     // 전투(투사체)·근접(병사) 시스템 생성 + 이펙트/사운드/화면흔들림 배선은 battleSystems로 분리.
-    const battle = createBattleSystems({ effects: this.effects, audio: this.audio, shake: this.shake });
+    const battle = createBattleSystems({ effects: this.effects, audio: this.audio, shake: this.shake, decals: this.decals });
     this.combat = battle.combat;
     this.melee = battle.melee;
 
@@ -158,6 +161,7 @@ export class Game {
         this.showHitbox = false;
         this.lastGold = this.economy.gold;
         this.unitSelection.reset(); // 재시작·타이틀 복귀 시 병사 선택·드래그 상태 초기화.
+        this.decals.reset(); this.vignette.reset(); // 잔해 데칼·비네트 연출 잔여 제거.
       },
     });
 
@@ -221,8 +225,7 @@ export class Game {
   }
 
   // ── update / render ─────────────────────────────────────────
-  // FPS·입력·플래시는 프레임당 1회, 게임 월드 갱신은 배속만큼 반복(dt를 키우지 않고 N회 호출).
-  // App(루프 소유)이 디펜스 활성 프레임에만 호출한다.
+  // FPS·입력·플래시는 프레임당 1회, 월드 갱신은 배속만큼 반복(App이 디펜스 활성 프레임에만 호출).
   update(dt: number): void {
     this.audio.resetFrame(); // 프레임당 발사/명중음 스로틀 카운터 리셋.
     this.fps.update(dt);
@@ -231,6 +234,7 @@ export class Game {
     this.interaction.updatePanel(); // 배럭 선택 시 병사 수/리스폰 실시간 반영(값 변할 때만).
     this.unitSelection.prune(); // 죽은 병사를 선택에서 정리(리스폰 교체분 자동 배제).
     this.shake.update(dt); // 화면흔들림은 실시간 기준 1회/프레임.
+    this.vignette.update(dt); // 기지 피격 비네트도 실시간 페이드(연출 — 배속 무관).
 
     // 게임 월드는 playing 상태에서만, 배속 수만큼 서브스텝으로 갱신.
     if (this.flow.state === 'playing') {
@@ -250,11 +254,12 @@ export class Game {
     for (const e of this.enemies) e.update(dt, this.flowField);
     // 전투(타겟팅·발사·명중·데미지·처치 골드)는 combat 시스템이 담당.
     this.combat.update(dt, this.interaction.towers, this.enemies, this.economy, this.flowField);
-    for (const e of this.enemies) if (e.reachedBase) this.economy.loseLife(1);
+    for (const e of this.enemies) if (e.reachedBase) { this.economy.loseLife(1); this.vignette.trigger(); }
     this.enemies = this.enemies.filter((e) => !e.dead && !e.reachedBase);
 
-    // 이펙트는 서브스텝 안에서 갱신 → 배속 시 이펙트도 같은 배율로 진행된다.
+    // 이펙트·잔해 데칼은 서브스텝 안에서 갱신 → 배속 시 페이드도 같은 배율로 진행된다.
     this.effects.update(dt);
+    this.decals.update(dt);
 
     // 웨이브 진행/완료 판정(스폰도 여기서 발생). 완료 판정은 스폰 이후의 실제 적 수로.
     this.waveManager.update(dt, () => this.enemies.length);
@@ -283,17 +288,12 @@ export class Game {
     renderDefense(this.ctx, {
       canvas: this.canvas, shake: this.shake,
       grid: this.grid, roadCells: this.roadCells,
-      showFlowDebug: this.showFlowDebug,
-      flowField: this.flowField,
-      interaction: this.interaction,
-      enemies: this.enemies,
-      unitSelection: this.unitSelection,
-      combat: this.combat,
-      effects: this.effects,
-      showHitbox: this.showHitbox,
-      hud: this.hud,
-      economy: this.economy,
-      waveManager: this.waveManager,
+      showFlowDebug: this.showFlowDebug, flowField: this.flowField,
+      interaction: this.interaction, enemies: this.enemies,
+      unitSelection: this.unitSelection, combat: this.combat,
+      effects: this.effects, decals: this.decals, vignette: this.vignette,
+      showHitbox: this.showHitbox, hud: this.hud,
+      economy: this.economy, waveManager: this.waveManager,
       flow: this.flow, fps: this.fps,
     });
   }

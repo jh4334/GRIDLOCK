@@ -7,11 +7,13 @@ import { MeleeSystem } from '../systems/melee';
 import type { EffectsSystem } from '../systems/effects';
 import type { AudioEngine } from '../core/audio';
 import type { ScreenShake } from './screenShake';
+import type { DecalField } from '../render/decals';
 
 export interface BattleHooks {
   effects: EffectsSystem;
   audio: AudioEngine;
   shake: ScreenShake;
+  decals: DecalField; // 적 사망 지점 잔해 데칼(D2.5).
 }
 
 /** combat + melee를 생성하고 이펙트/사운드/화면흔들림 훅을 배선해 돌려준다. */
@@ -24,6 +26,7 @@ export function createBattleSystems(h: BattleHooks): { combat: CombatSystem; mel
     },
     onKill: (x, y, color) => {
       h.effects.spawnKill(x, y, color);
+      h.decals.spawn(x, y); // 사망 지점에 어두운 궤적 잔해를 남긴다.
       h.audio.kill();
     },
     onCannonHit: () => {
@@ -36,6 +39,7 @@ export function createBattleSystems(h: BattleHooks): { combat: CombatSystem; mel
   const melee = new MeleeSystem({
     onEnemyKilled: (x, y, color) => {
       h.effects.spawnKill(x, y, color);
+      h.decals.spawn(x, y); // 근접 처치도 동일하게 잔해를 남긴다.
       h.audio.kill();
     },
     onSoldierKilled: (x, y, color) => {

@@ -13,6 +13,8 @@ import type { Interaction } from './interaction';
 import type { UnitSelection } from './unitSelection';
 import type { CombatSystem } from '../systems/combat';
 import type { EffectsSystem } from '../systems/effects';
+import type { DecalField } from '../render/decals';
+import type { Vignette } from '../render/vignette';
 import type { FlowField } from '../systems/pathfinding';
 import type { WaveManager } from './waves';
 import type { ScreenShake } from './screenShake';
@@ -33,6 +35,8 @@ export interface DefenseRenderParts {
   unitSelection: UnitSelection;
   combat: CombatSystem;
   effects: EffectsSystem;
+  decals: DecalField;
+  vignette: Vignette;
   showHitbox: boolean;
   hud: Hud;
   economy: Economy;
@@ -50,6 +54,7 @@ export function renderDefense(ctx: CanvasRenderingContext2D, p: DefenseRenderPar
 
   p.grid.render(ctx);
   renderRoad(ctx, p.roadCells); // 바닥 바로 위 — 적이 따르는 현재 최단 경로를 도로 타일로.
+  p.decals.render(ctx); // 잔해 데칼 — 바닥/도로 위, 엔티티 아래(D2.5).
   if (p.showFlowDebug) renderFlowField(ctx, p.flowField);
 
   p.interaction.renderHoverOrGhost(ctx);
@@ -72,4 +77,7 @@ export function renderDefense(ctx: CanvasRenderingContext2D, p: DefenseRenderPar
   p.fps.render(ctx);
 
   ctx.restore();
+
+  // 기지 피격 비네트는 화면흔들림 오프셋 밖(restore 이후)에서 화면 절대 좌표로 덮는다(D2.5).
+  p.vignette.render(ctx, p.canvas.width, p.canvas.height);
 }

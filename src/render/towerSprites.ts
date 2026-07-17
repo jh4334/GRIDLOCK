@@ -22,6 +22,7 @@ const TINT: Record<TowerVisualKind, string> = {
 
 const S = TILE; // 스프라이트 한 변.
 const LEVEL_MARK = GOLD;
+const RECOIL_PX = 2; // 발사 반동 시 포신 최대 후퇴 거리(px, 시각 상수).
 
 // ── 프리렌더 등록 ────────────────────────────────────────────────
 // 포탑은 레벨 1/2/3 각각 별도 key(turret1/2/3)로 둔다 — 벡터 폴백은 세 레벨 동일하지만,
@@ -148,7 +149,10 @@ function buildBunkerDeco(): HTMLCanvasElement {
 }
 
 // ── 그리기(매 프레임) ────────────────────────────────────────────
-/** 타워 베이스 + 포탑(aimAngle 회전) + 레벨 마커. (x,y)=칸 중심 픽셀. */
+/**
+ * 타워 베이스 + 포탑(aimAngle 회전) + 레벨 마커. (x,y)=칸 중심 픽셀.
+ * recoil(0~1)은 발사 반동 진행도 — 포신을 조준 반대 방향으로 최대 RECOIL_PX만큼 밀어 그린다.
+ */
 export function drawTower(
   ctx: CanvasRenderingContext2D,
   kind: TowerVisualKind,
@@ -156,13 +160,18 @@ export function drawTower(
   x: number,
   y: number,
   aimAngle: number,
+  recoil = 0,
 ): void {
   ctx.drawImage(getSprite(`tower/${kind}/base`), x - S / 2, y - S / 2);
   if (kind === 'barracks') {
     ctx.drawImage(getSprite('tower/barracks/deco'), x - S / 2, y - S / 2);
   } else {
     const lvl = Math.max(1, Math.min(3, level)); // 레벨별 포신(barrel1/2/3) 선택.
-    drawSprite(ctx, `tower/${kind}/turret${lvl}`, x, y, aimAngle);
+    // 발사 반동 — 포신을 조준 반대 방향으로 후퇴시켰다가 recoil이 0으로 감쇠하며 복귀한다.
+    const back = recoil * RECOIL_PX;
+    const ox = -Math.cos(aimAngle) * back;
+    const oy = -Math.sin(aimAngle) * back;
+    drawSprite(ctx, `tower/${kind}/turret${lvl}`, x + ox, y + oy, aimAngle);
   }
   drawLevelMarkers(ctx, x, y, level);
 }

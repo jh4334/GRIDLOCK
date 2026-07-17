@@ -17,6 +17,7 @@ import { drawExplosionRing } from '../render/fx';
 // 캐논 폭발 시각효과(밸런스 아님, 시각 상수). 파티클 시스템은 M6이므로 최소한만.
 const EXPLOSION_DURATION = 0.2; // 확장·페이드 지속(초).
 const EXPLOSION_COLOR = '#ffb04d';
+const RECOIL_TIME = 0.15; // 발사 반동 스프링 복귀 시간(초) — recoil 1 → 0 감쇠 기준(D2.5).
 
 interface Explosion {
   x: number;
@@ -57,6 +58,9 @@ export class CombatSystem {
     for (const t of towers) {
       if (t.isBarracks) continue; // 배럭은 투사체를 쏘지 않는다(M10).
 
+      // 발사 반동 감쇠(월드 시간 — 배속 서브스텝과 일관). 발사 여부와 무관하게 매 스텝 복귀시킨다.
+      if (t.recoil > 0) t.recoil = Math.max(0, t.recoil - dt / RECOIL_TIME);
+
       const center = cellCenter(t.cx, t.cy);
       // 사거리·공격력·슬로우 지속은 레벨 반영 실효 스탯 사용(M7 업그레이드).
       // 조준 대상은 매 프레임 계산(포탑 회전용) — 발사 여부와 무관하게 aimAngle을 갱신한다.
@@ -82,6 +86,7 @@ export class CombatSystem {
         }),
       );
       t.cooldown = 1 / t.spec.fireRate; // fireRate 회/s → 1/fireRate 초 간격.
+      t.recoil = 1; // 발사 순간 포신 최대 후퇴(render가 조준 반대로 밀어 그린다).
       this.cb.onFire?.(t.kind, center.x, center.y);
     }
   }
