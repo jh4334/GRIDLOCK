@@ -1,0 +1,7 @@
+{
+  "startGold": 220,
+  "startLives": 20,
+  "sellRefundRate": 0.7,
+  "waveClearBase": 20,
+  "waveClearPerWave": 8
+}

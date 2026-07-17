@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GRIDLOCK</title>
+    <style>
+      /* NEON GRID — 다크 네이비 + 네온 글로우 UI 테마. */
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        background: radial-gradient(circle at 50% 20%, #161b27 0%, #0d1117 70%);
+        color: #cdd7e5;
+        font-family: system-ui, sans-serif;
+      }
+      #app {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding-top: 16px;
+      }
+      #game-canvas {
+        background: #1a2416;
+        border: 1px solid rgba(201, 176, 92, 0.30);
+        border-radius: 4px;
+        box-shadow: 0 0 24px rgba(150, 170, 90, 0.14);
+      }
+      #controls,
+      #conquest-controls {
+        margin-top: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        width: 960px;
+      }
+      /* 공용 네온 버튼 베이스. */
+      .next-wave-btn,
+      .speed-btn,
+      .restart-btn,
+      .to-title-btn,
+      .endless-btn,
+      .tower-btn,
+      .upgrade-btn,
+      .sell-btn,
+      .mute-btn {
+        font-family: inherit;
+        font-size: 14px;
+        cursor: pointer;
+        background: rgba(20, 28, 44, 0.85);
+        color: #cfe4ff;
+        border: 1px solid rgba(120, 170, 230, 0.35);
+        border-radius: 6px;
+        transition: box-shadow 0.15s, border-color 0.15s, background 0.15s;
+      }
+      .next-wave-btn {
+        padding: 8px 18px;
+        border-color: rgba(57, 213, 255, 0.55);
+      }
+      .next-wave-btn:hover:not(:disabled) {
+        box-shadow: 0 0 12px rgba(57, 213, 255, 0.5);
+        border-color: #39d5ff;
+      }
+      .next-wave-btn:disabled {
+        color: #4a5468;
+        border-color: rgba(80, 96, 120, 0.3);
+        cursor: not-allowed;
+      }
+      /* 웨이브 프리뷰 — 다음 웨이브 구성(적 아이콘 + ×수). */
+      .wave-preview {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 2px 4px;
+      }
+      .wp-item {
+        display: flex;
+        align-items: center;
+        gap: 2px;
+      }
+      .wp-icon {
+        width: 20px;
+        height: 20px;
+      }
+      .wp-count {
+        font-size: 13px;
+        color: #a8bcd6;
+      }
+      .speed-group {
+        display: flex;
+        gap: 4px;
+      }
+      .speed-btn {
+        min-width: 40px;
+        padding: 8px 10px;
+      }
+      .speed-btn:hover {
+        border-color: #39d5ff;
+        box-shadow: 0 0 10px rgba(57, 213, 255, 0.35);
+      }
+      .speed-btn.active {
+        border-color: #4dffd5;
+        background: rgba(28, 60, 54, 0.9);
+        color: #d8fff5;
+        box-shadow: 0 0 12px rgba(77, 255, 213, 0.4);
+      }
+      .restart-btn {
+        padding: 8px 18px;
+        border-color: rgba(255, 77, 106, 0.55);
+        color: #ffd7de;
+      }
+      .restart-btn:hover {
+        box-shadow: 0 0 12px rgba(255, 77, 106, 0.5);
+        border-color: #ff4d6a;
+      }
+      .to-title-btn {
+        padding: 8px 18px;
+      }
+      .to-title-btn:hover {
+        border-color: #8fb4e6;
+        box-shadow: 0 0 10px rgba(143, 180, 230, 0.35);
+      }
+      /* 엔드리스 계속(D4.3) — 승리 오버레이 전용 강조 버튼. */
+      .endless-btn {
+        padding: 8px 18px;
+        border-color: rgba(255, 201, 77, 0.6);
+        color: #ffe6a8;
+      }
+      .endless-btn:hover {
+        border-color: #ffc94d;
+        box-shadow: 0 0 12px rgba(255, 201, 77, 0.5);
+      }
+      #build-menu,
+      #conquest-menu {
+        margin-top: 12px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+        width: 960px;
+      }
+      .tower-buttons {
+        display: flex;
+        gap: 10px;
+      }
+      .tower-btn {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 2px;
+        min-width: 84px;
+        padding: 8px 12px;
+      }
+      .tower-btn .t-cost {
+        color: #ffc94d;
+        font-size: 12px;
+      }
+      .tower-btn:hover:not(:disabled) {
+        border-color: #39d5ff;
+        box-shadow: 0 0 10px rgba(57, 213, 255, 0.35);
+      }
+      .tower-btn.active {
+        border-color: #4dffd5;
+        background: rgba(28, 60, 54, 0.9);
+        box-shadow: 0 0 12px rgba(77, 255, 213, 0.4);
+      }
+      .tower-btn.unaffordable,
+      .tower-btn:disabled {
+        color: #4a5468;
+        background: rgba(16, 22, 34, 0.8);
+        border-color: rgba(80, 96, 120, 0.3);
+        cursor: not-allowed;
+        box-shadow: none;
+      }
+      .tower-btn.unaffordable .t-cost {
+        color: #6a5a30;
+      }
+      .tower-panel-slot {
+        min-height: 92px;
+        display: flex;
+        justify-content: center;
+      }
+      .tower-panel {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 16px;
+        background: rgba(18, 24, 38, 0.9);
+        border: 1px solid rgba(57, 213, 255, 0.3);
+        border-radius: 8px;
+        box-shadow: 0 0 16px rgba(57, 213, 255, 0.1);
+      }
+      .tp-title {
+        font-size: 15px;
+        font-weight: 600;
+        color: #ffc94d;
+      }
+      .tp-stats {
+        display: flex;
+        gap: 14px;
+        font-size: 13px;
+        color: #a8bcd6;
+      }
+      .tp-actions {
+        display: flex;
+        gap: 10px;
+      }
+      .upgrade-btn {
+        padding: 8px 16px;
+        border-color: rgba(77, 255, 213, 0.5);
+        color: #d8fff5;
+      }
+      .upgrade-btn:hover:not(:disabled) {
+        box-shadow: 0 0 12px rgba(77, 255, 213, 0.45);
+        border-color: #4dffd5;
+      }
+      .upgrade-btn:disabled {
+        color: #4a5468;
+        border-color: rgba(80, 96, 120, 0.3);
+        cursor: not-allowed;
+      }
+      .sell-btn {
+        padding: 8px 16px;
+        border-color: rgba(255, 77, 106, 0.5);
+        color: #ffd7de;
+      }
+      .sell-btn:hover {
+        box-shadow: 0 0 12px rgba(255, 77, 106, 0.45);
+        border-color: #ff4d6a;
+      }
+      /* 4레벨 스페셜 분기(D4.2) — 선택 버튼 2개(이름+소문구) + 선택 표시. */
+      .tp-special-label {
+        font-size: 12px;
+        color: #ffc94d;
+        letter-spacing: 0.03em;
+      }
+      .tp-special-row {
+        display: flex;
+        gap: 8px;
+      }
+      .special-btn {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 2px;
+        min-width: 96px;
+        padding: 6px 10px;
+        border-color: rgba(255, 201, 77, 0.5);
+        color: #ffe6a8;
+      }
+      .special-btn .s-name {
+        font-size: 13px;
+        font-weight: 600;
+      }
+      .special-btn .s-desc {
+        font-size: 11px;
+        color: #a8bcd6;
+      }
+      .special-btn:hover:not(:disabled) {
+        border-color: #ffc94d;
+        box-shadow: 0 0 12px rgba(255, 201, 77, 0.4);
+      }
+      .special-btn:disabled {
+        color: #4a5468;
+        border-color: rgba(80, 96, 120, 0.3);
+        cursor: not-allowed;
+      }
+      .tp-special-chosen {
+        font-size: 13px;
+        font-weight: 600;
+        color: #ffc94d;
+      }
+      /* 사운드 옵션(D2.6) — 음소거 토글 + 음량 슬라이더. 컨트롤 바 우측에 붙는다. */
+      .audio-controls {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .mute-btn {
+        min-width: 62px;
+        padding: 8px 10px;
+        letter-spacing: 0.04em;
+      }
+      .mute-btn:hover {
+        border-color: #39d5ff;
+        box-shadow: 0 0 10px rgba(57, 213, 255, 0.35);
+      }
+      .mute-btn.muted {
+        border-color: #ff4d6a;
+        color: #ffd7de;
+        background: rgba(60, 24, 32, 0.9);
+        box-shadow: 0 0 12px rgba(255, 77, 106, 0.4);
+      }
+      .volume-slider {
+        width: 96px;
+        accent-color: #39d5ff;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <canvas id="game-canvas" width="960" height="672"></canvas>
+      <div id="controls"></div>
+      <div id="conquest-controls"></div>
+      <div id="build-menu"></div>
+      <div id="conquest-menu"></div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
