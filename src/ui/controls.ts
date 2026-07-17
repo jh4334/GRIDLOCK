@@ -7,16 +7,20 @@ export interface ControlsConfig {
   onNextWave: () => void;
   onSetSpeed: (speed: number) => void;
   onRestart: () => void;
+  onToTitle: () => void; // 승/패 후 타이틀 화면으로 복귀.
 }
 
 export class Controls {
+  private readonly root: HTMLElement;
   private readonly nextBtn: HTMLButtonElement;
   private readonly speedBtns = new Map<number, HTMLButtonElement>();
   private readonly restartBtn: HTMLButtonElement;
+  private readonly toTitleBtn: HTMLButtonElement;
 
   constructor(config: ControlsConfig) {
     const root = document.getElementById('controls');
     if (!root) throw new Error('#controls 컨테이너를 찾을 수 없습니다.');
+    this.root = root;
 
     this.nextBtn = document.createElement('button');
     this.nextBtn.className = 'next-wave-btn';
@@ -42,6 +46,13 @@ export class Controls {
     this.restartBtn.addEventListener('click', () => config.onRestart());
     this.restartBtn.style.display = 'none';
     root.appendChild(this.restartBtn);
+
+    this.toTitleBtn = document.createElement('button');
+    this.toTitleBtn.className = 'to-title-btn';
+    this.toTitleBtn.textContent = '타이틀로';
+    this.toTitleBtn.addEventListener('click', () => config.onToTitle());
+    this.toTitleBtn.style.display = 'none';
+    root.appendChild(this.toTitleBtn);
   }
 
   /** 다음 웨이브 버튼 활성/비활성(대기 중에만 활성). */
@@ -54,8 +65,14 @@ export class Controls {
     for (const [s, btn] of this.speedBtns) btn.classList.toggle('active', s === speed);
   }
 
-  /** 승리/패배 시 다시 시작 버튼 노출. */
+  /** 승리/패배 시 다시 시작 + 타이틀로 버튼 노출. */
   showRestart(show: boolean): void {
     this.restartBtn.style.display = show ? '' : 'none';
+    this.toTitleBtn.style.display = show ? '' : 'none';
+  }
+
+  /** 컨트롤 바 전체 표시/숨김 — menu 상태에선 숨긴다. */
+  setBarVisible(show: boolean): void {
+    this.root.style.display = show ? '' : 'none';
   }
 }

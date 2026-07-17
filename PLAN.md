@@ -41,8 +41,8 @@
 - [x] T8.1 치트로 전 구간 반복 플레이 → JSON 수치만 조정 [DoD: 본인이 클리어 가능하되 15웨이브쯤에서 아슬아슬]
 
 **M9. 배포 ★ TD 완성 지점**
-- [ ] T9.1 타이틀 화면 + localStorage 최고기록 [DoD]
-- [ ] T9.2 프로덕션 빌드 + GitHub Pages/Vercel 배포 [DoD: 공개 URL로 플레이 가능]
+- [x] T9.1 타이틀 화면 + localStorage 최고기록 [DoD]
+- [x] T9.2 프로덕션 빌드 + GitHub Pages/Vercel 배포 [DoD: 공개 URL로 플레이 가능] — 워크플로 구성 완료, main 머지 + 저장소 Pages 활성화(Settings→Pages→Source: GitHub Actions) 필요
 
 > 여기서 멈춰도 포트폴리오에 올릴 완성작 1개. 이하는 RTS 진화.
 

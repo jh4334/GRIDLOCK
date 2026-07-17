@@ -75,7 +75,10 @@ export class Keyboard {
   private readonly onKeyDown = (e: KeyboardEvent): void => {
     if (e.repeat) return;
     const fn = this.handlers.get(e.key.toLowerCase());
-    if (fn) fn();
+    if (fn) {
+      e.preventDefault(); // 게임 조작 키의 기본 동작(예: Space 페이지 스크롤) 차단.
+      fn();
+    }
   };
 
   constructor() {

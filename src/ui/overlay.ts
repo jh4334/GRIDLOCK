@@ -3,19 +3,23 @@
 // (다시 시작 버튼은 HTML(ui/controls)에서 담당 — 캔버스 밖 UI는 DOM으로.)
 
 import type { GameState } from '../game/state';
+import type { BestRecord } from '../core/storage';
+import { formatBest } from './title';
 
 const OVERLAY_BG = 'rgba(0, 0, 0, 0.72)';
 const COLOR_WIN = '#7bd67b';
 const COLOR_LOSE = '#ff6b6b';
 const COLOR_SUB = '#e0e0e0';
+const COLOR_BEST = '#9ad0ff';
 
 export function renderOverlay(
   ctx: CanvasRenderingContext2D,
   state: GameState,
   reachedWave: number,
   totalWaves: number,
+  best: BestRecord | null,
 ): void {
-  if (state === 'playing') return;
+  if (state !== 'won' && state !== 'lost') return;
 
   const w = ctx.canvas.width;
   const h = ctx.canvas.height;
@@ -36,6 +40,11 @@ export function renderOverlay(
   ctx.font = '22px system-ui, sans-serif';
   const sub = won ? `${totalWaves}웨이브 클리어` : `도달 웨이브 ${reachedWave}/${totalWaves}`;
   ctx.fillText(sub, w / 2, h / 2 + 28);
+
+  // 최고기록(타이틀 화면과 동일 포맷).
+  ctx.fillStyle = COLOR_BEST;
+  ctx.font = '17px monospace';
+  ctx.fillText(formatBest(best), w / 2, h / 2 + 68);
 
   ctx.restore();
 }

@@ -37,6 +37,7 @@ export class BuildMenu {
   private readonly buttons = new Map<TowerKind, HTMLButtonElement>();
   private readonly costs = new Map<TowerKind, number>();
   private readonly panelSlot: HTMLDivElement;
+  private readonly root: HTMLElement;
   private readonly onUpgrade: () => void;
   private readonly onSell: () => void;
 
@@ -46,6 +47,7 @@ export class BuildMenu {
 
     const root = document.getElementById('build-menu');
     if (!root) throw new Error('#build-menu 컨테이너를 찾을 수 없습니다.');
+    this.root = root;
 
     const row = document.createElement('div');
     row.className = 'tower-buttons';
@@ -65,6 +67,11 @@ export class BuildMenu {
     this.panelSlot = document.createElement('div');
     this.panelSlot.className = 'tower-panel-slot';
     root.appendChild(this.panelSlot);
+  }
+
+  /** 빌드 메뉴 전체 표시/숨김 — menu 상태에선 숨긴다. */
+  setVisible(show: boolean): void {
+    this.root.style.display = show ? '' : 'none';
   }
 
   /** 설치 모드 대상 버튼만 하이라이트. null이면 전부 해제. */
