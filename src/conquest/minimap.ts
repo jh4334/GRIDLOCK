@@ -6,7 +6,8 @@ import { COLS, ROWS, TILE } from '../game/grid';
 
 // 미니맵에 찍을 좌표 묶음(칸 기반: 크리스탈·구조물 / 픽셀 기반: 이동 유닛).
 export interface MinimapData {
-  crystals: { cx: number; cy: number; depleted: boolean }[];
+  // amount/maxAmount로 잔량 비율을 계산해 점 알파에 반영(고갈 임박 시 희미). Crystal이 구조적으로 만족.
+  crystals: { cx: number; cy: number; depleted: boolean; amount: number; maxAmount: number }[];
   playerStructures: { cx: number; cy: number }[]; // 아군 건물 + 본진.
   enemyStructures: { cx: number; cy: number }[]; // 적 건물 + 본진.
   playerMobs: { x: number; y: number }[]; // 아군 전투 유닛 + 일꾼.
@@ -39,11 +40,18 @@ export function renderMinimap(ctx: CanvasRenderingContext2D, data: MinimapData):
   ctx.lineWidth = 1;
   ctx.strokeRect(ox + 0.5, oy + 0.5, MM_W - 1, MM_H - 1);
 
-  const cellDot = (cx: number, cy: number, color: string): void => {
+  const cellDot = (cx: number, cy: number, color: string, alpha = 1): void => {
+    ctx.globalAlpha = alpha;
     ctx.fillStyle = color;
     ctx.fillRect(ox + cx * CELL, oy + cy * CELL, CELL, CELL);
+    ctx.globalAlpha = 1;
   };
-  for (const c of data.crystals) if (!c.depleted) cellDot(c.cx, c.cy, COLOR_CRYSTAL);
+  // 크리스탈: 잔량 비율을 알파에 반영(0.3~1.0) — 고갈 임박 시 희미, 고갈되면 미표시.
+  for (const c of data.crystals) {
+    if (c.depleted) continue;
+    const ratio = c.maxAmount > 0 ? c.amount / c.maxAmount : 0;
+    cellDot(c.cx, c.cy, COLOR_CRYSTAL, 0.3 + 0.7 * ratio);
+  }
   for (const s of data.playerStructures) cellDot(s.cx, s.cy, COLOR_PLAYER_STRUCT);
   for (const s of data.enemyStructures) cellDot(s.cx, s.cy, COLOR_ENEMY_STRUCT);
 

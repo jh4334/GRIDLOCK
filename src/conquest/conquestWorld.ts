@@ -52,11 +52,10 @@ export class ConquestWorld {
     this.grid.setState(this.playerHQ.cx, this.playerHQ.cy, 'wall');
     this.grid.setState(this.enemyHQ.cx, this.enemyHQ.cy, 'wall');
 
-    const cells = [...C.crystal.playerCells, ...C.crystal.enemyCells, ...C.crystal.centerCells];
-    for (const [cx, cy] of cells) {
-      this.crystals.push(new Crystal(cx, cy, C.crystal.amount));
-      this.grid.setState(cx, cy, 'crystal');
-    }
+    // 매장량 차등(D3.2): 본진 필드는 소량(home), 중앙 2칸은 대량(center) — 확장 유도.
+    const add = (cx: number, cy: number, amt: number): void => { this.crystals.push(new Crystal(cx, cy, amt)); this.grid.setState(cx, cy, 'crystal'); };
+    for (const [cx, cy] of [...C.crystal.playerCells, ...C.crystal.enemyCells]) add(cx, cy, C.crystal.amount.home);
+    for (const [cx, cy] of C.crystal.centerCells) add(cx, cy, C.crystal.amount.center);
 
     this.combat = new ConquestCombat({
       onUnitKilled: (x, y, color, side) => {

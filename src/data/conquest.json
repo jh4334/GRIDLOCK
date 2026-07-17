@@ -29,7 +29,10 @@
     "harvestTime": 2
   },
   "crystal": {
-    "amount": 400,
+    "amount": {
+      "home": 300,
+      "center": 800
+    },
     "playerCells": [
       [
         4,
