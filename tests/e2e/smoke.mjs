@@ -11,7 +11,7 @@
 // 표시)로 판정한다. 실패 시 어느 단계에서 깨졌는지 stderr 한 줄 + 비-0 종료(runner가 감지).
 
 import { chromium } from 'playwright-core';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
@@ -141,6 +141,14 @@ async function defenseStage(page) {
   await page.keyboard.press('Escape');
 
   await vis(page, '.speed-btn:has-text("x3")').click();
+
+  // D2.3 웨이브 프리뷰: 웨이브 1 시작 전, 프리뷰 아이콘 수 합계 = waves.json 1웨이브 총 마리수.
+  stage = 'defense-preview';
+  const waves = JSON.parse(await readFile(join(HERE, '../../src/data/waves.json'), 'utf8'));
+  const wave1Total = waves.waves[0].reduce((n, g) => n + g.count, 0);
+  const counts = await page.locator('#controls .wave-preview .wp-count').allTextContents();
+  const previewTotal = counts.reduce((n, t) => n + parseInt(t.replace(/\D/g, ''), 10), 0);
+  check(previewTotal === wave1Total, `웨이브1 프리뷰 합계(${previewTotal}) ≠ waves.json(${wave1Total})`);
 
   const nextBtn = vis(page, '.next-wave-btn');
   check(await nextBtn.isEnabled(), '웨이브 시작 전 다음 웨이브 버튼이 비활성');

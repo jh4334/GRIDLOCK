@@ -29,6 +29,12 @@ interface SpawnEvent {
 
 export type WavePhase = 'ready' | 'inProgress';
 
+// 다음 웨이브 프리뷰용 — 적 종류별 마리수 합산 항목.
+export interface WaveComposition {
+  kind: EnemyKind;
+  count: number;
+}
+
 export interface WaveCallbacks {
   // hpMultiplier = hpScalePerWave^(웨이브-1). 스폰 시점의 flowField는 game이 클로저로 주입.
   spawn: (kind: EnemyKind, hpMultiplier: number) => void;
@@ -36,6 +42,8 @@ export interface WaveCallbacks {
   onWaveClear: (waveNumber: number, bonus: number) => void;
   // 마지막 웨이브까지 완료 → 승리.
   onVictory: () => void;
+  // 다음 웨이브가 바뀌는 시점(시작/완료/리셋)에만 호출 — 프리뷰 갱신용(매 프레임 아님).
+  onWaveChange?: () => void;
 }
 
 const TOTAL_WAVES = wavesData.totalWaves;
@@ -63,6 +71,19 @@ export class WaveManager {
   get canStart(): boolean {
     return this.phase === 'ready' && this.waveNumber < TOTAL_WAVES;
   }
+
+  /**
+   * 다음 웨이브(waveNumber+1) 구성을 종류별로 합산해 돌려준다. 프리뷰 표시용.
+   * 스폰 스케줄과 같은 groupsForWave를 사용하므로 실제 스폰 구성과 일치가 보장된다.
+   * 남은 웨이브가 없으면 빈 배열(프리뷰 숨김).
+   */
+  nextWaveComposition(): WaveComposition[] {
+    const next = this.waveNumber + 1;
+    if (next > TOTAL_WAVES) return [];
+    const totals = new Map<EnemyKind, number>();
+    for (const g of groupsForWave(next)) totals.set(g.kind, (totals.get(g.kind) ?? 0) + g.count);
+    return [...totals].map(([kind, count]) => ({ kind, count }));
+  }
   private get allSpawned(): boolean {
     return this.nextIndex >= this.schedule.length;
   }
@@ -75,6 +96,7 @@ export class WaveManager {
     this.nextIndex = 0;
     this.elapsed = 0;
     this.phase = 'inProgress';
+    this.cb.onWaveChange?.();
     return true;
   }
 
@@ -117,6 +139,7 @@ export class WaveManager {
     const bonus = economyData.waveClearBase + economyData.waveClearPerWave * this.waveNumber;
     this.phase = 'ready';
     this.cb.onWaveClear(this.waveNumber, bonus);
+    this.cb.onWaveChange?.();
     if (this.waveNumber >= TOTAL_WAVES) this.cb.onVictory();
   }
 
@@ -127,6 +150,7 @@ export class WaveManager {
     this.schedule = [];
     this.nextIndex = 0;
     this.elapsed = 0;
+    this.cb.onWaveChange?.();
   }
 }
 

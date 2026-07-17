@@ -1,6 +1,9 @@
-// 캔버스 위 컨트롤 바(HTML) — 다음 웨이브 버튼 / 배속 버튼(x1·x2·x3) / 다시 시작 버튼.
+// 캔버스 위 컨트롤 바(HTML) — 다음 웨이브 버튼 / 웨이브 프리뷰 / 배속 버튼(x1·x2·x3) / 다시 시작.
 // 캔버스 밖 UI는 DOM으로 처리한다(DESIGN.md). 상태는 Game이 소유하고, 이 바는
 // 클릭을 콜백으로 알리고 표시(활성/하이라이트/노출)만 갱신한다.
+
+import { WavePreview } from './wavePreview';
+import type { WaveComposition } from '../game/waves';
 
 export interface ControlsConfig {
   speeds: number[]; // 예: [1, 2, 3]
@@ -15,6 +18,7 @@ export interface ControlsConfig {
 export class Controls {
   private readonly root: HTMLElement;
   private readonly nextBtn: HTMLButtonElement | null = null;
+  private readonly wavePreview: WavePreview | null = null;
   private readonly speedBtns = new Map<number, HTMLButtonElement>();
   private readonly restartBtn: HTMLButtonElement;
   private readonly toTitleBtn: HTMLButtonElement;
@@ -32,6 +36,10 @@ export class Controls {
       nextBtn.addEventListener('click', () => config.onNextWave?.());
       root.appendChild(nextBtn);
       this.nextBtn = nextBtn;
+
+      // 다음 웨이브 버튼 옆에 다음 웨이브 구성(아이콘×수) 프리뷰를 붙인다.
+      this.wavePreview = new WavePreview();
+      root.appendChild(this.wavePreview.el);
     }
 
     const speedGroup = document.createElement('div');
@@ -64,6 +72,11 @@ export class Controls {
   /** 다음 웨이브 버튼 활성/비활성(대기 중에만 활성). 정복 모드엔 버튼이 없어 무시. */
   setNextWaveEnabled(enabled: boolean): void {
     if (this.nextBtn) this.nextBtn.disabled = !enabled;
+  }
+
+  /** 다음 웨이브 구성 프리뷰 갱신(시작/완료/리셋 시점에만 호출). 정복 모드엔 프리뷰가 없어 무시. */
+  setWavePreview(comp: WaveComposition[]): void {
+    this.wavePreview?.set(comp);
   }
 
   /** 현재 배속 버튼만 하이라이트. */

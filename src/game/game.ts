@@ -100,6 +100,8 @@ export class Game {
         this.flow.win();
         this.audio.win();
       },
+      // 시작/완료/리셋 시점에만 다음 웨이브 구성을 프리뷰에 반영(매 프레임 아님).
+      onWaveChange: () => this.controls.setWavePreview(this.waveManager.nextWaveComposition()),
     });
 
     this.controls = new Controls({
@@ -153,9 +155,7 @@ export class Game {
       shake: this.shake,
       buildMenu: this.buildMenu,
       controls: this.controls,
-      clearEnemies: () => {
-        this.enemies = [];
-      },
+      clearEnemies: () => { this.enemies = []; },
       recomputeField: () => this.recomputeField(),
       setSpeed: (s) => this.setSpeed(s),
       resetView: () => {
