@@ -11,6 +11,9 @@ import { Grid } from './grid';
 import { Economy } from './economy';
 import { computeFlowField, FlowField } from '../systems/pathfinding';
 import { CombatSystem } from '../systems/combat';
+import { EffectsSystem } from '../systems/effects';
+import { AudioEngine } from '../core/audio';
+import { ScreenShake } from './screenShake';
 import { Enemy, createEnemy } from '../entities/enemy';
 import { towerSpec, TowerKind } from '../entities/tower';
 import towersData from '../data/towers.json';
@@ -38,7 +41,10 @@ export class Game {
   private readonly hud = new Hud();
   private readonly buildMenu: BuildMenu;
   private readonly spawner: DebugSpawner;
-  private readonly combat = new CombatSystem();
+  private readonly combat: CombatSystem;
+  private readonly effects = new EffectsSystem();
+  private readonly audio = new AudioEngine();
+  private readonly shake = new ScreenShake();
   private readonly controls: Controls;
   private readonly waveManager: WaveManager;
   private readonly interaction: Interaction;
@@ -64,12 +70,33 @@ export class Game {
       this.enemies.push(createEnemy(kind, this.flowField));
     });
 
+    // 전투 이펙트/사운드/화면흔들림은 combat 훅으로 배선(combat은 좌표만 넘김).
+    this.combat = new CombatSystem({
+      onFire: (kind) => this.audio.fire(kind),
+      onDamage: (x, y, amount) => {
+        this.effects.spawnDamage(x, y, amount);
+        this.audio.hit();
+      },
+      onKill: (x, y, color) => {
+        this.effects.spawnKill(x, y, color);
+        this.audio.kill();
+      },
+      onCannonHit: () => {
+        this.shake.trigger();
+        this.audio.boom();
+      },
+    });
+
     // 웨이브 스포너 — 스폰 시점의 flowField를 클로저로 주입(설치/판매로 바뀌어도 최신값 사용).
     this.waveManager = new WaveManager({
       spawn: (kind, hpMult) => this.enemies.push(createEnemy(kind, this.flowField, hpMult)),
-      onWaveClear: (_wave, bonus) => this.economy.addGold(bonus),
+      onWaveClear: (_wave, bonus) => {
+        this.economy.addGold(bonus);
+        this.audio.waveClear();
+      },
       onVictory: () => {
         this.state = 'won';
+        this.audio.win();
       },
     });
 
@@ -115,6 +142,7 @@ export class Game {
     });
     this.keyboard.on('escape', () => this.interaction.handleEscape());
     this.keyboard.on('x', () => this.interaction.sellSelected());
+    this.keyboard.on('m', () => this.audio.toggleMute()); // 음소거 토글.
     this.keyboard.on('r', () => this.restart()); // 승리/패배 후 다시 시작.
   }
 
@@ -154,12 +182,14 @@ export class Game {
     this.interaction.reset();
     this.grid.resetCells();
     this.combat.reset();
+    this.effects.reset();
     this.waveManager.reset();
     this.recomputeField();
 
     this.state = 'playing';
     this.setSpeed(1);
     this.showHitbox = false;
+    this.shake.reset();
 
     this.lastGold = this.economy.gold;
     this.buildMenu.updateAffordability(this.economy.gold);
@@ -170,9 +200,11 @@ export class Game {
   // FPS·입력(호버/고스트)·플래시는 프레임당 1회, 게임 월드 갱신은 배속만큼 반복한다.
   // (배속은 dt를 키우지 않고 update(dt)를 N회 호출 — 슬로우/쿨다운 타이머 정확도 유지.)
   private update(dt: number): void {
+    this.audio.resetFrame(); // 프레임당 발사/명중음 스로틀 카운터 리셋.
     this.fps.update(dt);
     this.interaction.updateHover(this.input);
     this.interaction.updateFlash(dt);
+    this.shake.update(dt); // 화면흔들림은 실시간 기준 1회/프레임.
 
     // 게임 월드는 playing 상태에서만, 배속 수만큼 서브스텝으로 갱신.
     if (this.state === 'playing') {
@@ -193,10 +225,16 @@ export class Game {
     for (const e of this.enemies) if (e.reachedBase) this.economy.loseLife(1);
     this.enemies = this.enemies.filter((e) => !e.dead && !e.reachedBase);
 
+    // 이펙트는 서브스텝 안에서 갱신 → 배속 시 이펙트도 같은 배율로 진행된다.
+    this.effects.update(dt);
+
     // 웨이브 진행/완료 판정(스폰도 여기서 발생). 완료 판정은 스폰 이후의 실제 적 수로.
     this.waveManager.update(dt, () => this.enemies.length);
 
-    if (this.economy.isDefeated) this.state = 'lost';
+    if (this.economy.isDefeated) {
+      this.state = 'lost';
+      this.audio.lose();
+    }
   }
 
   // 상태 변화에 따른 UI 동기화(프레임당 1회). 골드 변동 시에만 빌드 메뉴 갱신.
@@ -214,7 +252,11 @@ export class Game {
     const ctx = this.ctx;
     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
-    // 그리드(정적) → 플로우 디버그 → 호버/고스트 → 타워 → 거부 플래시 → 적 → 전투(투사체·폭발) → HUD → FPS.
+    // 화면흔들림 — 캔버스 전체를 오프셋(계산은 update, 여기선 적용만). translate는 clear 이후.
+    ctx.save();
+    if (this.shake.active) ctx.translate(this.shake.x, this.shake.y);
+
+    // 그리드(정적) → 플로우 디버그 → 호버/고스트 → 타워 → 거부 플래시 → 적 → 전투(투사체·폭발) → 이펙트 → HUD → FPS.
     this.grid.render(ctx);
     if (this.showFlowDebug) renderFlowField(ctx, this.flowField);
 
@@ -224,6 +266,7 @@ export class Game {
 
     for (const e of this.enemies) e.render(ctx);
     this.combat.render(ctx); // 투사체·폭발은 적 위에 그린다.
+    this.effects.render(ctx); // 데미지 숫자·처치 파티클은 최상단.
 
     if (this.showHitbox) renderHitboxes(ctx, this.enemies, this.interaction.towers); // H 치트.
 
@@ -234,5 +277,7 @@ export class Game {
     // 승리/패배 오버레이는 HUD 위, FPS 아래로 그린다.
     renderOverlay(ctx, this.state, this.waveManager.current, this.waveManager.total);
     this.fps.render(ctx);
+
+    ctx.restore();
   }
 }

@@ -6,7 +6,7 @@
 // update(dt, ...)에서만 상태를 변경하고 render(ctx)는 읽기 전용(CLAUDE.md 규칙).
 // 죽은 적은 game.ts가, 명중한 투사체는 이 시스템이 프레임 끝 filter로 일괄 제거.
 
-import type { Tower } from '../entities/tower';
+import type { Tower, TowerKind } from '../entities/tower';
 import type { Enemy } from '../entities/enemy';
 import type { Economy } from '../game/economy';
 import type { FlowField } from './pathfinding';
@@ -24,9 +24,20 @@ interface Explosion {
   timer: number; // 남은 시간(초).
 }
 
+// 전투가 이펙트·사운드를 직접 그리지 않도록, 발생 시점만 훅으로 알린다(Game이 배선).
+// combat은 좌표·값만 넘기고, 이펙트/오디오/화면흔들림 연결은 Game의 책임.
+export interface CombatCallbacks {
+  onFire?(kind: TowerKind, x: number, y: number): void; // 타워 발사 순간.
+  onDamage?(x: number, y: number, amount: number): void; // 명중 지점 데미지(스플래시는 적마다).
+  onKill?(x: number, y: number, color: string): void; // 적 처치 순간.
+  onCannonHit?(x: number, y: number): void; // 캐논 폭발(화면흔들림·붐).
+}
+
 export class CombatSystem {
   private projectiles: Projectile[] = [];
   private explosions: Explosion[] = [];
+
+  constructor(private cb: CombatCallbacks = {}) {}
 
   /** 재시작 — 진행 중인 투사체·폭발을 모두 비운다. */
   reset(): void {
@@ -65,6 +76,7 @@ export class CombatSystem {
         }),
       );
       t.cooldown = 1 / t.spec.fireRate; // fireRate 회/s → 1/fireRate 초 간격.
+      this.cb.onFire?.(t.kind, center.x, center.y);
     }
   }
 
@@ -113,6 +125,7 @@ export class CombatSystem {
         if (dx * dx + dy * dy <= r2) this.applyHit(e, p, economy);
       }
       this.explosions.push({ x: p.x, y: p.y, radius: p.splashRadius, timer: EXPLOSION_DURATION });
+      this.cb.onCannonHit?.(p.x, p.y); // 화면흔들림·붐 트리거.
     } else {
       // 단일 타격: 대상이 아직 살아있을 때만(먼저 죽었으면 지점 도달 후 그냥 소멸).
       const e = p.hitTarget;
@@ -124,9 +137,11 @@ export class CombatSystem {
   private applyHit(e: Enemy, p: Projectile, economy: Economy): void {
     if (p.slowFactor > 0) e.applySlow(p.slowFactor, p.slowDuration);
     e.hp -= p.damage;
+    this.cb.onDamage?.(e.x, e.y, p.damage); // 명중 지점 데미지 팝업.
     if (e.hp <= 0 && !e.dead) {
       e.dead = true;
       economy.addGold(e.reward);
+      this.cb.onKill?.(e.x, e.y, e.color); // 처치 파티클·처치음.
     }
   }
 
