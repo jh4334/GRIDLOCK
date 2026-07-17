@@ -1,6 +1,10 @@
 {
   "totalWaves": 20,
   "hpScalePerWave": 1.12,
+  "earlyCall": {
+    "goldPerRemainingSecond": 1,
+    "maxBonus": 20
+  },
   "waves": [
     [
       {

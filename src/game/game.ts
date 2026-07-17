@@ -92,14 +92,10 @@ export class Game {
     // 웨이브 스포너 — 스폰 시점의 flowField를 클로저로 주입(설치/판매로 바뀌어도 최신값 사용).
     this.waveManager = new WaveManager({
       spawn: (kind, hpMult) => this.enemies.push(createEnemy(kind, this.flowField, hpMult)),
-      onWaveClear: (_wave, bonus) => {
-        this.economy.addGold(bonus);
-        this.audio.waveClear();
-      },
-      onVictory: () => {
-        this.flow.win();
-        this.audio.win();
-      },
+      // 웨이브 클리어·조기 호출(얼리콜) 보너스는 같은 피드백(골드+사운드)을 재사용한다.
+      onWaveClear: (_wave, bonus) => this.awardBonus(bonus),
+      onEarlyCall: (bonus) => this.awardBonus(bonus),
+      onVictory: () => { this.flow.win(); this.audio.win(); },
       // 시작/완료/리셋 시점에만 다음 웨이브 구성을 프리뷰에 반영(매 프레임 아님).
       onWaveChange: () => this.controls.setWavePreview(this.waveManager.nextWaveComposition()),
     });
@@ -204,9 +200,12 @@ export class Game {
   }
 
   // ── 웨이브 / 배속 ──────────────────────────────────────────────
+  // 웨이브 클리어·얼리콜 공통 보너스 지급(골드 + 사운드).
+  private awardBonus(bonus: number): void { this.economy.addGold(bonus); this.audio.waveClear(); }
+
   private startNextWave(): void {
     if (this.flow.state !== 'playing') return;
-    this.waveManager.startNextWave();
+    this.waveManager.startNextWave(() => this.enemies.length); // 적 수 → 얼리콜 보너스 판단(D2.4).
   }
 
   // N 치트 — 필드의 적을 보상 없이 제거하고 현재 웨이브를 즉시 완료 처리.
@@ -273,9 +272,10 @@ export class Game {
       this.buildMenu.updateAffordability(this.economy.gold);
       this.interaction.refreshPanel(); // 골드 변동 → 업그레이드 버튼 활성 여부 갱신.
     }
-    // 다음 웨이브 버튼은 진행 중 + 대기 상태 + 남은 웨이브가 있을 때만 활성.
+    // 다음 웨이브 버튼은 진행 중이라도 남은 웨이브가 있으면 활성(중첩 웨이브, D2.4).
     const state = this.flow.state;
     this.controls.setNextWaveEnabled(state === 'playing' && this.waveManager.canStart);
+    this.controls.setWaveInProgress(this.waveManager.inProgress); // 진행 상태를 DOM에 반영(E2E 관찰용).
     this.controls.showRestart(state === 'won' || state === 'lost'); // menu는 바 자체가 숨김.
   }
 

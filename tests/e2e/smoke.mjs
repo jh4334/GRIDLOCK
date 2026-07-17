@@ -3,7 +3,7 @@
 // 다섯 단계를 순서대로 검증하고 각 단계 스크린샷을 tests/e2e/out/ 에 남긴다:
 //   1) 타이틀 렌더            → 게임 모드 UI가 숨은 타이틀 상태 확인
 //   2) 디펜스: 봉쇄 배치 거부  → 스폰 3면 포위 후 마지막 칸 설치가 거부됨을 그리드 상태로 확인
-//   3) 디펜스: 처치→웨이브 완료 → 화력 배치 후 웨이브1이 전멸로 완료(다음 웨이브 버튼 재활성)
+//   3) 디펜스: 중첩 웨이브+처치 → 화력 배치 후 웨이브1 진행 중 조기 호출(웨이브2 중첩)→ 둘 다 전멸로 일괄 완료
 //   4) 정복: 일꾼 생산→채집    → 채집으로 크리스탈이 늘어 보급고(75) 건설이 가능해짐(버튼 활성)
 //   5) 정복: 방치 패배 도달    → 치트 없이 x3 방치 → 적 웨이브가 본진을 함락 → 패배 오버레이(다시 시작 버튼 노출)
 //
@@ -130,10 +130,10 @@ async function defenseStage(page) {
   check(await vis(page, '.tower-panel').isVisible(), '설치된 타워(0,6) 선택 시 패널이 안 뜸(판정 신뢰 불가)');
   await page.keyboard.press('Escape');
 
-  // ── 처치 → 웨이브 완료 ──
+  // ── 중첩 웨이브(D2.4) + 처치 → 일괄 완료 ──
   // 스폰 앞 (0,6)(0,8)에 더해 통로(7행) 중반 (8,6)(12,6)까지 애로우를 펼쳐 화력을 배치한다.
-  // 타워는 "가장 앞선 적"을 노리므로 분산 배치가 표적을 나눠 처치 효율이 높다. 웨이브1(그런트
-  // 6)은 전투 후 전멸해 필드가 비고, 이때 다음 웨이브 버튼이 재활성된다(= 완료 판정).
+  // 타워는 "가장 앞선 적"을 노리므로 분산 배치가 표적을 나눠 처치 효율이 높다. 웨이브1 진행 중에
+  // 조기 호출로 웨이브2를 중첩 시작하고, 두 웨이브의 적이 전부 처리되면 진행 상태가 해제된다(= 일괄 완료).
   stage = 'defense-kill';
   await selectArrow();
   await placeAt(8, 6);
@@ -151,16 +151,25 @@ async function defenseStage(page) {
   check(previewTotal === wave1Total, `웨이브1 프리뷰 합계(${previewTotal}) ≠ waves.json(${wave1Total})`);
 
   const nextBtn = vis(page, '.next-wave-btn');
+  // 진행 상태는 버튼의 data-inprogress로 관찰(중첩 웨이브라 버튼 활성 여부로는 완료를 못 가른다).
+  const inProgress = async () => (await nextBtn.getAttribute('data-inprogress')) === 'true';
   check(await nextBtn.isEnabled(), '웨이브 시작 전 다음 웨이브 버튼이 비활성');
   await nextBtn.click();
 
-  // 웨이브 진행 중이면 버튼이 비활성 → 완료되면 재활성. 이 전이 = 웨이브1 클리어.
-  const started = await waitUntil(page, async () => await nextBtn.isDisabled(), 6000);
-  check(started, '다음 웨이브를 눌러도 웨이브가 시작되지 않음(버튼 비활성 전이 없음)');
-  const cleared = await waitUntil(page, async () => await nextBtn.isEnabled(), 30000);
-  check(cleared, '웨이브1이 제한 시간 내 완료되지 않음(적을 처치하지 못함)');
+  // 웨이브1 시작 → 진행 상태로 전이. 중첩 웨이브라 진행 중에도 버튼은 계속 활성이어야 한다.
+  const started = await waitUntil(page, inProgress, 6000);
+  check(started, '다음 웨이브를 눌러도 웨이브가 시작되지 않음(진행 상태 전이 없음)');
+  check(await nextBtn.isEnabled(), '웨이브1 진행 중 다음 웨이브 버튼이 비활성(중첩 호출 불가)');
 
-  // 완료 시점에 다시 시작 버튼이 없어야 함 = 패배/승리가 아니라 정상 진행 중임을 보장.
+  // 조기 호출(얼리콜) 1회 — 웨이브1이 아직 진행 중일 때 웨이브2를 중첩 시작(보너스 지급 경로).
+  await nextBtn.click();
+
+  // 두 웨이브의 적이 전부 처리되면 진행 상태가 해제(data-inprogress=false) = 일괄 완료 처리.
+  const cleared = await waitUntil(page, async () => !(await inProgress()), 40000);
+  check(cleared, '중첩 웨이브가 제한 시간 내 완료되지 않음(적을 처치하지 못함)');
+
+  // 완료 후에도 버튼이 활성(재활성)이고 다시 시작 버튼이 없어야 함 = 승/패 미발생·정상 진행.
+  check(await nextBtn.isEnabled(), '웨이브 완료 후 다음 웨이브 버튼이 비활성(재활성 실패)');
   check(!(await page.locator('#controls .restart-btn').isVisible()), '웨이브 완료 대신 승/패로 종료됨');
   await page.screenshot({ path: join(OUT, '03-defense-wave-clear.png') });
 }

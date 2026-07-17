@@ -79,6 +79,11 @@ export class Controls {
     this.wavePreview?.set(comp);
   }
 
+  /** 진행 중 웨이브 유무를 버튼 data 속성에 반영(중첩 웨이브 상태 관찰용 — E2E/디버그). */
+  setWaveInProgress(inProgress: boolean): void {
+    if (this.nextBtn) this.nextBtn.dataset.inprogress = String(inProgress);
+  }
+
   /** 현재 배속 버튼만 하이라이트. */
   setActiveSpeed(speed: number): void {
     for (const [s, btn] of this.speedBtns) btn.classList.toggle('active', s === speed);
