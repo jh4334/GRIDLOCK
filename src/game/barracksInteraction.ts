@@ -9,7 +9,8 @@ import { cellCenter, pixelToCell } from './grid';
 import { Barracks } from '../entities/unit';
 import { Tower } from '../entities/tower';
 import type { TowerKind } from '../entities/tower';
-import type { SoldierPanelInfo } from '../ui/buildMenu';
+import type { SoldierPanelInfo, TowerPanelInfo } from '../ui/buildMenu';
+import economyData from '../data/economy.json';
 
 /** 종류에 맞는 타워 인스턴스 생성 — 배럭이면 병사를 운용하는 Barracks, 그 외엔 기본 Tower. */
 export function createTower(kind: TowerKind, cx: number, cy: number, grid: Grid): Tower {
@@ -43,6 +44,31 @@ export function soldierPanelInfo(selected: Tower | null): SoldierPanelInfo | und
 export function barracksPanelSig(selected: Tower | null, gold: number): string | null {
   if (!(selected instanceof Barracks)) return null;
   return `${selected.level}|${selected.aliveCount}|${selected.respawningCount}|${gold}`;
+}
+
+/** 판매 환급 골드 — 누적 투자액 × 환급률. showPanel·sellSelected가 공유한다. */
+export function sellRefund(t: Tower): number {
+  return Math.round(t.invested * economyData.sellRefundRate);
+}
+
+/**
+ * 선택 타워 → 정보 패널 DTO. 배럭이면 soldierPanelInfo가 병사 스탯 섹션을 채운다.
+ * (interaction.ts가 300줄을 넘어 패널 값 구성 로직을 여기로 분리 — M11.)
+ */
+export function towerPanelInfo(t: Tower, gold: number): TowerPanelInfo {
+  const cost = t.upgradeCost;
+  return {
+    name: t.spec.name,
+    level: t.level,
+    maxLevel: t.maxLevel,
+    damage: Math.round(t.effectiveDamage * 10) / 10, // 소수 1자리.
+    range: Math.round(t.effectiveRange),
+    fireRate: t.spec.fireRate,
+    soldier: soldierPanelInfo(t), // 배럭이면 병사 스탯, 아니면 undefined(일반 타워 패널).
+    upgradeCost: cost,
+    canAffordUpgrade: cost !== null && gold >= cost,
+    refund: sellRefund(t),
+  };
 }
 
 /**

@@ -52,6 +52,17 @@ export class Soldier {
   state: SoldierState = 'moving';
   dead = false; // hp<=0. Barracks.maintain이 제거하고 리스폰 큐에 넣는다.
 
+  // ── RTS 이동 명령(M11) ──
+  // 명령 경로 — A*가 만든 칸 중심 웨이포인트 목록. 앞에서부터 소비한다(비면 도착).
+  path: { x: number; y: number }[] = [];
+  // 개별 집결지 — 이동 명령 도착점(산개 슬롯). null이면 배럭 슬롯으로 복귀한다.
+  rallyOverride: { x: number; y: number } | null = null;
+
+  /** 지금 대기해야 할 지점 — 개별 명령이 있으면 그 슬롯, 없으면 배럭 집결 슬롯. */
+  guardPoint(): { x: number; y: number } {
+    return this.rallyOverride ?? this.barracks.slotPosition(this.slot);
+  }
+
   constructor(o: SoldierOptions) {
     this.barracks = o.barracks;
     this.slot = o.slot;
@@ -82,9 +93,18 @@ export class Soldier {
     return false;
   }
 
-  /** 교전 대상이 없을 때 자기 집결지 슬롯으로 복귀. 도착하면 idle, 아니면 moving. */
+  /**
+   * 교전 대상이 없을 때의 이동 — 명령 경로가 남아 있으면 그 웨이포인트를 순차로 따라가고,
+   * 다 소비했으면 자기 대기 지점(guardPoint)으로 복귀. 도착하면 idle, 아니면 moving.
+   */
   returnToRally(dt: number): void {
-    const p = this.barracks.slotPosition(this.slot);
+    if (this.path.length > 0) {
+      const wp = this.path[0];
+      if (this.moveToward(wp.x, wp.y, dt)) this.path.shift(); // 웨이포인트 도달 → 다음 칸으로.
+      this.state = 'moving';
+      return;
+    }
+    const p = this.guardPoint();
     const arrived = this.moveToward(p.x, p.y, dt);
     this.state = arrived ? 'idle' : 'moving';
   }
@@ -179,13 +199,6 @@ export class Barracks extends Tower {
       x: this.rallyX + Math.cos(ang) * this.bspec.rallyRadius,
       y: this.rallyY + Math.sin(ang) * this.bspec.rallyRadius,
     };
-  }
-
-  /** 집결지 반경 내(적 감지·교전 유효 범위)인가. */
-  withinEngage(x: number, y: number): boolean {
-    const dx = x - this.rallyX;
-    const dy = y - this.rallyY;
-    return dx * dx + dy * dy <= this.engageRadius * this.engageRadius;
   }
 
   /** 우클릭으로 새 집결지 지정(호출부가 통행 가능 여부를 이미 검증). */

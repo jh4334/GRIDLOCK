@@ -10,10 +10,9 @@ import { TILE, cellToPixel, pixelToCell } from './grid';
 import type { Economy } from './economy';
 import type { Enemy } from '../entities/enemy';
 import { Tower, towerSpec, TowerKind, TOWER_INSET } from '../entities/tower';
-import { barracksList, soldierPanelInfo, barracksPanelSig, setRallyFromClick, renderUnits, createTower } from './barracksInteraction';
+import { barracksList, barracksPanelSig, setRallyFromClick, renderUnits, createTower, towerPanelInfo, sellRefund } from './barracksInteraction';
 import { isCellPlaceable, isPathClear } from '../systems/placement';
 import type { BuildMenu } from '../ui/buildMenu';
-import economyData from '../data/economy.json';
 
 // 시각 상수(밸런스 아님).
 const COLOR_HOVER = 'rgba(255, 255, 255, 0.18)';
@@ -91,6 +90,16 @@ export class Interaction {
     this.deps.buildMenu.showTowerPanel(null);
   }
 
+  /** 설치 모드인가 — 좌클릭 라우팅(설치 vs 병사 선택)을 Game이 가르는 데 쓴다(M11). */
+  get isPlacing(): boolean {
+    return this.placeKind !== null;
+  }
+
+  /** 병사 선택과 상호 배타 — 병사 선택 시 Game이 호출해 타워 패널을 닫는다(M11). */
+  clearTowerSelection(): void {
+    this.deselect();
+  }
+
   /** 현재 설치된 배럭 목록(melee 시스템·병사 렌더용). 반환 타입은 barracksList에서 추론. */
   get barracks() {
     return barracksList(this.towers);
@@ -101,30 +110,11 @@ export class Interaction {
     setRallyFromClick(this.deps.grid, this.selectedTower, px, py);
   }
 
-  private refundOf(t: Tower): number {
-    return Math.round(t.invested * economyData.sellRefundRate);
-  }
-
   // 선택된 타워의 정보 패널을 현재 스탯·골드로 다시 그린다(선택/업그레이드/골드 변동 시).
+  // 패널 값 구성은 barracksInteraction.towerPanelInfo가 담당한다(interaction.ts 300줄 제한).
   private showPanel(): void {
     const t = this.selectedTower;
-    if (!t) {
-      this.deps.buildMenu.showTowerPanel(null);
-      return;
-    }
-    const cost = t.upgradeCost;
-    this.deps.buildMenu.showTowerPanel({
-      name: t.spec.name,
-      level: t.level,
-      maxLevel: t.maxLevel,
-      damage: Math.round(t.effectiveDamage * 10) / 10, // 소수 1자리.
-      range: Math.round(t.effectiveRange),
-      fireRate: t.spec.fireRate,
-      soldier: soldierPanelInfo(t), // 배럭이면 병사 스탯, 아니면 undefined(일반 타워 패널).
-      upgradeCost: cost,
-      canAffordUpgrade: cost !== null && this.deps.economy.gold >= cost,
-      refund: this.refundOf(t),
-    });
+    this.deps.buildMenu.showTowerPanel(t ? towerPanelInfo(t, this.deps.economy.gold) : null);
   }
 
   /** 골드 변동 시 Game이 호출 — 선택 중이면 업그레이드 버튼 활성 여부를 다시 반영한다. */
@@ -197,7 +187,7 @@ export class Interaction {
   sellSelected(): void {
     const t = this.selectedTower;
     if (!t) return;
-    const refund = this.refundOf(t);
+    const refund = sellRefund(t);
     this.towers.splice(this.towers.indexOf(t), 1);
     this.deps.grid.setState(t.cx, t.cy, 'empty');
     this.deps.economy.addGold(refund);

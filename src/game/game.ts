@@ -26,6 +26,8 @@ import { renderOverlay } from '../ui/overlay';
 import { WaveManager } from './waves';
 import { DebugCheats, renderHitboxes } from '../debug/cheats';
 import { Interaction } from './interaction';
+import { UnitSelection } from './unitSelection';
+import { bindGameInput } from './gameInput';
 import { renderTitle } from '../ui/title';
 import { GameFlow } from './flow';
 
@@ -52,13 +54,12 @@ export class Game {
   private readonly controls: Controls;
   private readonly waveManager: WaveManager;
   private readonly interaction: Interaction;
+  private readonly unitSelection: UnitSelection; // 병사 선택·이동 명령(M11).
   private readonly flow: GameFlow; // menu/playing/won/lost 상태머신 + 최고기록 소유.
 
   private flowField: FlowField;
   private enemies: Enemy[] = [];
-
   private speed = 1; // 배속(서브스텝 반복 횟수). update가 게임 월드를 이 횟수만큼 갱신.
-
   private showFlowDebug = false;
   private showHitbox = false; // H 치트로 토글하는 히트박스 오버레이.
   private lastGold: number; // 골드 변동 감지용(변할 때만 메뉴 갱신).
@@ -130,6 +131,9 @@ export class Game {
       recomputeField: () => this.recomputeField(),
     });
 
+    // 병사 선택·이동 명령(M11) — 병사 목록은 배럭 로스터에서 매 조회.
+    this.unitSelection = new UnitSelection(this.grid, () => this.interaction.barracks);
+
     // 상태머신 — 서브시스템 참조 + Game 소유 필드(enemies/speed/hitbox/lastGold) 리셋 콜백 주입.
     this.flow = new GameFlow({
       economy: this.economy,
@@ -149,27 +153,21 @@ export class Game {
       resetView: () => {
         this.showHitbox = false;
         this.lastGold = this.economy.gold;
+        this.unitSelection.reset(); // 재시작·타이틀 복귀 시 병사 선택·드래그 상태 초기화.
       },
     });
 
-    // 캔버스 클릭 — menu에선 게임 시작, 그 외엔 설치/선택 상호작용.
-    this.input.onClick((x, y) => {
-      if (this.flow.state === 'menu') this.flow.startGame();
-      else this.interaction.handleClick(x, y);
+    // 마우스·키보드 배선은 gameInput으로 분리(M11, game.ts 300줄 제한). 좌클릭 라우팅·드래그
+    // 선택·우클릭 명령·단축키를 한곳에서 등록한다.
+    bindGameInput({
+      input: this.input,
+      keyboard: this.keyboard,
+      flow: this.flow,
+      interaction: this.interaction,
+      unitSelection: this.unitSelection,
+      audio: this.audio,
+      toggleFlowDebug: () => (this.showFlowDebug = !this.showFlowDebug),
     });
-    // 우클릭 — 게임 중일 때만 선택된 배럭의 집결지 지정(M10). contextmenu는 input이 항상 차단.
-    this.input.onRightClick((x, y) => {
-      if (this.flow.state === 'playing') this.interaction.handleRightClick(x, y);
-    });
-    this.keyboard.on('d', () => {
-      this.showFlowDebug = !this.showFlowDebug;
-    });
-    this.keyboard.on('escape', () => this.interaction.handleEscape());
-    this.keyboard.on('u', () => this.interaction.upgradeSelected()); // 선택 타워 업그레이드.
-    this.keyboard.on('x', () => this.interaction.sellSelected());
-    this.keyboard.on('m', () => this.audio.toggleMute()); // 음소거 토글.
-    this.keyboard.on('r', () => this.flow.restart()); // 승리/패배 후 다시 시작.
-    this.keyboard.on(' ', () => this.flow.startGame()); // Space — 타이틀에서 시작.
   }
 
   start(): void {
@@ -201,14 +199,14 @@ export class Game {
   }
 
   // ── update / render ─────────────────────────────────────────
-  // FPS·입력(호버/고스트)·플래시는 프레임당 1회, 게임 월드 갱신은 배속만큼 반복한다.
-  // (배속은 dt를 키우지 않고 update(dt)를 N회 호출 — 슬로우/쿨다운 타이머 정확도 유지.)
+  // FPS·입력·플래시는 프레임당 1회, 게임 월드 갱신은 배속만큼 반복(dt를 키우지 않고 N회 호출).
   private update(dt: number): void {
     this.audio.resetFrame(); // 프레임당 발사/명중음 스로틀 카운터 리셋.
     this.fps.update(dt);
     this.interaction.updateHover(this.input);
     this.interaction.updateFlash(dt);
     this.interaction.updatePanel(); // 배럭 선택 시 병사 수/리스폰 실시간 반영(값 변할 때만).
+    this.unitSelection.prune(); // 죽은 병사를 선택에서 정리(리스폰 교체분 자동 배제).
     this.shake.update(dt); // 화면흔들림은 실시간 기준 1회/프레임.
 
     // 게임 월드는 playing 상태에서만, 배속 수만큼 서브스텝으로 갱신.
@@ -280,9 +278,11 @@ export class Game {
     this.interaction.renderFlash(ctx);
 
     for (const e of this.enemies) e.render(ctx);
+    this.unitSelection.renderRings(ctx); // 선택 링은 병사 아래에 깔리도록 먼저 그린다(M11).
     this.interaction.renderUnits(ctx); // 병사·집결지 마커는 적 위에 그린다(M10).
     this.combat.render(ctx); // 투사체·폭발은 적 위에 그린다.
     this.effects.render(ctx); // 데미지 숫자·처치 파티클은 최상단.
+    this.unitSelection.renderDragBox(ctx); // 드래그 선택 박스는 최상단 UI 레이어(M11).
 
     if (this.showHitbox) renderHitboxes(ctx, this.enemies, this.interaction.towers); // H 치트.
 
