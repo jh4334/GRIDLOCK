@@ -12,7 +12,7 @@
 
 ## D1. 검증 하네스 (루프의 안전망 — 최우선)
 
-- [ ] D1.1 E2E 스모크 테스트 승격: 세션 스크래치패드에서 쓰던 Playwright 검증 패턴을 레포 `tests/e2e/`로 정식화한다.
+- [x] D1.1 E2E 스모크 테스트 승격: 세션 스크래치패드에서 쓰던 Playwright 검증 패턴을 레포 `tests/e2e/`로 정식화한다.
   - `tests/e2e/smoke.mjs` 하나로: ① 타이틀 렌더 ② 디펜스: 타워 설치→웨이브 1 시작→처치로 골드 증가 확인 ③ 봉쇄 배치 거부 확인 ④ 정복: 진입→일꾼 생산→크리스탈 증가 확인. 각 단계 스크린샷을 `tests/e2e/out/`에 저장(이 폴더는 .gitignore).
   - 실행기: `node tests/e2e/smoke.mjs` (playwright-core는 devDependency로 추가 — 게임 런타임 의존성이 아니므로 CLAUDE.md 라이브러리 금지 규칙과 충돌하지 않음. 커밋 메시지에 근거 명시), Chromium 경로는 환경변수 `PW_CHROMIUM`(기본 `/opt/pw-browsers/chromium`).
   - package.json에 `"test:e2e": "vite preview --port 4173 & node tests/e2e/smoke.mjs"` 형태(포트 충돌 처리 포함, 종료 시 서버 정리).
