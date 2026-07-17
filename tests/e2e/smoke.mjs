@@ -1,10 +1,11 @@
 // GRIDLOCK E2E 스모크 테스트 (D1.1) — 세션 스크래치패드의 Playwright 검증 패턴을 레포로 승격.
 //
-// 네 단계를 순서대로 검증하고 각 단계 스크린샷을 tests/e2e/out/ 에 남긴다:
+// 다섯 단계를 순서대로 검증하고 각 단계 스크린샷을 tests/e2e/out/ 에 남긴다:
 //   1) 타이틀 렌더            → 게임 모드 UI가 숨은 타이틀 상태 확인
 //   2) 디펜스: 봉쇄 배치 거부  → 스폰 3면 포위 후 마지막 칸 설치가 거부됨을 그리드 상태로 확인
 //   3) 디펜스: 처치→웨이브 완료 → 화력 배치 후 웨이브1이 전멸로 완료(다음 웨이브 버튼 재활성)
 //   4) 정복: 일꾼 생산→채집    → 채집으로 크리스탈이 늘어 보급고(75) 건설이 가능해짐(버튼 활성)
+//   5) 정복: 방치 패배 도달    → 치트 없이 x3 방치 → 적 웨이브가 본진을 함락 → 패배 오버레이(다시 시작 버튼 노출)
 //
 // 골드/크리스탈 숫자는 캔버스라 직접 못 읽으므로, 전부 관찰 가능한 DOM 상태(버튼 활성/패널
 // 표시)로 판정한다. 실패 시 어느 단계에서 깨졌는지 stderr 한 줄 + 비-0 종료(runner가 감지).
@@ -40,6 +41,7 @@ async function main() {
     await titleStage(page);
     await defenseStage(page);
     await conquestStage(page);
+    await conquestDefeatStage(page);
     // 어느 단계에서든 런타임 예외가 났으면 실패로 본다(콘솔 pageerror 수집).
     stage = 'page-errors';
     check(errors.length === 0, `페이지 런타임 오류 ${errors.length}건: ${errors.join(' | ')}`);
@@ -207,6 +209,30 @@ async function conquestStage(page) {
   await page.mouse.click(...cell(4, 12));
   await page.waitForTimeout(1500);
   await page.screenshot({ path: join(OUT, '05-conquest-harvest.png') });
+}
+
+// ── 5) 정복: 치트 없이 x3 방치 → 본진 함락 → 패배 오버레이 ─────────
+async function conquestDefeatStage(page) {
+  // 4단계의 잔여 경제(일꾼·건물)가 판정을 흐리지 않게, 깨끗한 상태로 정복에 재진입한다.
+  // (타이틀 경유 = 새로 로드 후 정복 버튼. conquestStage와 동일한 진입 패턴 재사용.)
+  stage = 'conquest-defeat-enter';
+  await page.goto(BASE_URL);
+  await page.waitForTimeout(1100);
+  const { pt } = await canvasMapper(page);
+  await page.mouse.click(...pt(620, 403));
+  await page.waitForTimeout(500);
+
+  // 아무 것도 하지 않고 x3로 방치 — 적 AI가 빌드오더대로 병력을 모아 웨이브를 보내고(첫 웨이브
+  // ≈120 sim초 = x3에서 ~40실초), 무방비 본진(HQ 900hp)이 함락된다. 치트·개입 없음.
+  stage = 'conquest-defeat-idle';
+  await vis(page, '.speed-btn:has-text("x3")').click();
+
+  // 패배 확정 신호: 정복 컨트롤의 '다시 시작' 버튼이 노출(showRestart(true))된다. 방치 패배는
+  // x3에서 45~60초 실측 — 타임아웃 90초로 여유를 둔다.
+  const restartBtn = vis(page, '.restart-btn');
+  const defeated = await waitUntil(page, async () => await restartBtn.isVisible().catch(() => false), 90000);
+  check(defeated, '방치 90초 내 본진이 함락되지 않음(패배 오버레이 미도달)');
+  await page.screenshot({ path: join(OUT, '06-conquest-defeat.png') });
 }
 
 main().catch((err) => {

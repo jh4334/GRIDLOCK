@@ -17,7 +17,7 @@
   - 실행기: `node tests/e2e/smoke.mjs` (playwright-core는 devDependency로 추가 — 게임 런타임 의존성이 아니므로 CLAUDE.md 라이브러리 금지 규칙과 충돌하지 않음. 커밋 메시지에 근거 명시), Chromium 경로는 환경변수 `PW_CHROMIUM`(기본 `/opt/pw-browsers/chromium`).
   - package.json에 `"test:e2e": "vite preview --port 4173 & node tests/e2e/smoke.mjs"` 형태(포트 충돌 처리 포함, 종료 시 서버 정리).
   - [DoD: `npm run build && npm run test:e2e`가 로컬에서 통과하고 스크린샷 4장 이상 생성]
-- [ ] D1.2 이후 모든 태스크의 DoD 검증에 D1.1 스모크 + 해당 기능 전용 캡처를 사용하도록 이 문서 상단 규칙에 이미 반영됨 — 이 태스크에서는 스모크에 "정복 승패 도달(치트 없이 x3 방치 패배)" 시나리오를 추가한다. [DoD: 패배 오버레이 스크린샷 자동 캡처]
+- [x] D1.2 이후 모든 태스크의 DoD 검증에 D1.1 스모크 + 해당 기능 전용 캡처를 사용하도록 이 문서 상단 규칙에 이미 반영됨 — 이 태스크에서는 스모크에 "정복 승패 도달(치트 없이 x3 방치 패배)" 시나리오를 추가한다. [DoD: 패배 오버레이 스크린샷 자동 캡처]
 
 ## D2. 디펜스 모드 QoL & 주스 ②
 
