@@ -9,7 +9,8 @@ import type { Grid } from './grid';
 import { TILE, cellToPixel, pixelToCell } from './grid';
 import type { Economy } from './economy';
 import type { Enemy } from '../entities/enemy';
-import { Tower, towerSpec, TowerKind, TOWER_INSET } from '../entities/tower';
+import { Tower, towerSpec, TowerKind } from '../entities/tower';
+import { drawTower, type TowerVisualKind } from '../render/towerSprites';
 import { barracksList, barracksPanelSig, setRallyFromClick, renderUnits, createTower, towerPanelInfo, sellRefund } from './barracksInteraction';
 import { isCellPlaceable, isPathClear } from '../systems/placement';
 import type { BuildMenu } from '../ui/buildMenu';
@@ -276,13 +277,11 @@ export class Interaction {
     ctx.fillStyle = g.valid ? COLOR_GHOST_OK : COLOR_GHOST_BAD;
     ctx.fillRect(x, y, TILE, TILE);
 
-    // 반투명 고스트 타워(설치 후 모습과 동일한 여백).
+    // 반투명 고스트 타워 — 실제 설치 스프라이트를 반투명하게 미리 보여준다.
     if (this.placeKind) {
       ctx.save();
       ctx.globalAlpha = GHOST_ALPHA;
-      ctx.fillStyle = towerSpec(this.placeKind).color;
-      const size = TILE - TOWER_INSET * 2;
-      ctx.fillRect(x + TOWER_INSET, y + TOWER_INSET, size, size);
+      drawTower(ctx, this.placeKind as TowerVisualKind, 1, x + TILE / 2, y + TILE / 2, 0);
       ctx.restore();
     }
   }

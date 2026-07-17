@@ -10,7 +10,7 @@
 const DAMAGE_LIFE = 0.6; // 표시 지속(초).
 const DAMAGE_RISE = 26; // 수명 동안 떠오르는 총 픽셀 거리.
 const DAMAGE_FONT = 13; // px.
-const DAMAGE_COLOR = '#fff2a8';
+const DAMAGE_COLOR = '#ffd98a'; // 앰버 계열(NEON GRID 팔레트).
 const DAMAGE_JITTER = 8; // 겹침 방지용 가로 흔들림 폭(px).
 
 // 처치 파티클(시각 상수).
@@ -87,11 +87,14 @@ export class EffectsSystem {
   render(ctx: CanvasRenderingContext2D): void {
     ctx.save();
 
+    // 처치 파티클 — 가산 발광(lighter)으로 네온 파편 느낌.
+    ctx.globalCompositeOperation = 'lighter';
     for (const q of this.particles) {
       ctx.globalAlpha = Math.max(0, q.timer / KILL_LIFE);
       ctx.fillStyle = q.color;
       ctx.fillRect(q.x - KILL_SIZE / 2, q.y - KILL_SIZE / 2, KILL_SIZE, KILL_SIZE);
     }
+    ctx.globalCompositeOperation = 'source-over';
 
     ctx.font = `bold ${DAMAGE_FONT}px system-ui, sans-serif`;
     ctx.textAlign = 'center';

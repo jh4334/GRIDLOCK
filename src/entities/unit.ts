@@ -12,14 +12,17 @@ import type { PathGrid } from '../systems/astar';
 import { Tower, UPGRADE } from './tower';
 import type { BarracksSpec } from './tower';
 import type { Enemy } from './enemy';
+import { drawTrooper } from '../render/unitSprites';
+import { drawHpBar } from '../render/hpbar';
+import { ALLY_CYAN, withAlpha } from '../render/palette';
 
 // 병사 상태머신: 집결지로/대기 이동(moving) → 대기(idle) ↔ 교전(engaging) → 사망(dead).
 export type SoldierState = 'moving' | 'idle' | 'engaging' | 'dead';
 
 // 병사 렌더 상수(밸런스 아님, 시각 상수).
-const SOLDIER_OUTLINE = '#26324a';
 const HP_BAR_HEIGHT = 3;
-const HP_BAR_GAP = 5;
+const HP_BAR_GAP = 6;
+const ALLY_HP = ALLY_CYAN;
 
 interface SoldierOptions {
   barracks: Barracks;
@@ -47,6 +50,7 @@ export class Soldier {
   hp: number;
   maxHp: number;
   damage: number;
+  facing = 0; // 이동 방향각(rad) — moveToward가 갱신, render가 쉐브론 회전에 사용.
   attackCooldown = 0; // 다음 공격까지 남은 시간(초). melee가 감소·갱신.
   target: Enemy | null = null; // 현재 교전 대상(melee가 지정·해제).
   state: SoldierState = 'moving';
@@ -83,6 +87,7 @@ export class Soldier {
     const dy = ty - this.y;
     const d = Math.hypot(dx, dy);
     const step = this.speed * dt;
+    if (d > 0) this.facing = Math.atan2(dy, dx); // 이동 방향으로 쉐브론 회전(렌더용).
     if (d <= step || d === 0) {
       this.x = tx;
       this.y = ty;
@@ -117,32 +122,26 @@ export class Soldier {
     this.damage = damage;
   }
 
-  // 렌더는 읽기 전용 — 아군 색 작은 원 + 외곽선 + HP바(적과 구분).
+  // 렌더는 읽기 전용 — 아군(시안) 코어 + 방향 쉐브론 스프라이트 + HP바.
   render(ctx: CanvasRenderingContext2D): void {
-    ctx.fillStyle = this.color;
-    ctx.strokeStyle = SOLDIER_OUTLINE;
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-
-    const ratio = Math.max(0, this.hp / this.maxHp);
-    const barW = this.radius * 2;
-    const bx = this.x - this.radius;
-    const by = this.y - this.radius - HP_BAR_GAP - HP_BAR_HEIGHT;
-    ctx.fillStyle = '#000';
-    ctx.fillRect(bx - 1, by - 1, barW + 2, HP_BAR_HEIGHT + 2);
-    ctx.fillStyle = '#7fd0ff'; // 아군 HP바 — 적(초록→빨강)과 다른 하늘색.
-    ctx.fillRect(bx, by, barW * ratio, HP_BAR_HEIGHT);
+    drawTrooper(ctx, 'ally', this.x, this.y, this.facing, this.radius);
+    drawHpBar(
+      ctx,
+      this.x - this.radius,
+      this.y - this.radius - HP_BAR_GAP - HP_BAR_HEIGHT,
+      this.radius * 2,
+      HP_BAR_HEIGHT,
+      this.hp / this.maxHp,
+      ALLY_HP,
+    );
   }
 }
 
-// 집결지 마커(시각 상수).
+// 집결지 마커(시각 상수) — 시안 네온 페넌트.
 const FLAG_HEIGHT = 22;
-const FLAG_COLOR = '#eaf0ff';
-const FLAG_POLE = '#c8c8d0';
-const RALLY_RING = 'rgba(234, 240, 255, 0.25)';
+const FLAG_COLOR = ALLY_CYAN;
+const FLAG_POLE = '#9fb4cc';
+const RALLY_RING = withAlpha(ALLY_CYAN, 0.28);
 
 export class Barracks extends Tower {
   readonly bspec: BarracksSpec;

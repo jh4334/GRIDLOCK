@@ -3,11 +3,11 @@
 // 최고기록 문자열 포맷(formatBest)은 승/패 오버레이와 공유한다.
 
 import type { BestRecord } from '../core/storage';
+import { animTime } from '../render/sprites';
 
-const COLOR_BG = '#1a1a1f';
-const COLOR_LOGO = '#9ad0ff';
-const COLOR_SUB = '#c8c8d0';
-const COLOR_BEST = '#7bd67b';
+const COLOR_LOGO = '#8fe0ff';
+const COLOR_SUB = '#8aa0c0';
+const COLOR_BEST = '#4dffd5';
 
 export type TitleMode = 'defense' | 'conquest';
 
@@ -57,25 +57,31 @@ export function renderTitle(ctx: CanvasRenderingContext2D, best: BestRecord | nu
   const h = ctx.canvas.height;
 
   ctx.save();
-  ctx.fillStyle = COLOR_BG;
-  ctx.fillRect(0, 0, w, h);
+  paintBackdrop(ctx, w, h);
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
 
-  // 로고
-  ctx.fillStyle = COLOR_LOGO;
+  // 로고 — 네온 글로우(맥동).
+  const glow = 18 + Math.sin(animTime() * 2) * 6;
+  ctx.save();
   ctx.font = 'bold 84px system-ui, sans-serif';
+  ctx.shadowColor = '#39d5ff';
+  ctx.shadowBlur = glow;
+  ctx.fillStyle = COLOR_LOGO;
   ctx.fillText('GRIDLOCK', w / 2, h * 0.22);
+  ctx.shadowBlur = glow * 0.5;
+  ctx.fillText('GRIDLOCK', w / 2, h * 0.22); // 2차 패스로 글로우 강화.
+  ctx.restore();
 
   // 부제
   ctx.fillStyle = COLOR_SUB;
   ctx.font = '22px system-ui, sans-serif';
   ctx.fillText('미로형 타워 디펜스 · 미니 RTS', w / 2, h * 0.22 + 58);
 
-  // 모드 버튼
+  // 모드 버튼(네온)
   const b = titleButtons(w, h);
-  drawButton(ctx, b.defense, '디펜스 모드', '#2e5a7a', '#4080a8', '#e6f2ff', '20웨이브 생존');
-  drawButton(ctx, b.conquest, '정복 모드', '#7a4e2e', '#a87840', '#ffe9d6', '본진 정복 RTS');
+  drawButton(ctx, b.defense, '디펜스 모드', '#39d5ff', '20웨이브 생존');
+  drawButton(ctx, b.conquest, '정복 모드', '#ff4d6a', '본진 정복 RTS');
 
   // 최고기록(디펜스 기준)
   ctx.textAlign = 'center';
@@ -87,27 +93,50 @@ export function renderTitle(ctx: CanvasRenderingContext2D, best: BestRecord | nu
   ctx.restore();
 }
 
-function drawButton(
-  ctx: CanvasRenderingContext2D,
-  r: Rect,
-  label: string,
-  fill: string,
-  border: string,
-  text: string,
-  sub: string,
-): void {
-  ctx.fillStyle = fill;
+// 다크 네이비 배경 + 옅은 그리드 + 스캔라인.
+function paintBackdrop(ctx: CanvasRenderingContext2D, w: number, h: number): void {
+  const g = ctx.createLinearGradient(0, 0, 0, h);
+  g.addColorStop(0, '#0d1117');
+  g.addColorStop(1, '#161b27');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, w, h);
+
+  ctx.strokeStyle = 'rgba(110, 170, 255, 0.06)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (let x = 0; x <= w; x += 48) {
+    ctx.moveTo(x + 0.5, 0);
+    ctx.lineTo(x + 0.5, h);
+  }
+  for (let y = 0; y <= h; y += 48) {
+    ctx.moveTo(0, y + 0.5);
+    ctx.lineTo(w, y + 0.5);
+  }
+  ctx.stroke();
+
+  // 스캔라인(가로 옅은 줄).
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.12)';
+  for (let y = 0; y < h; y += 3) ctx.fillRect(0, y, w, 1);
+}
+
+function drawButton(ctx: CanvasRenderingContext2D, r: Rect, label: string, neon: string, sub: string): void {
+  ctx.save();
+  // 어두운 패널 + 네온 테두리 글로우.
+  ctx.fillStyle = 'rgba(20, 28, 44, 0.85)';
   ctx.fillRect(r.x, r.y, r.w, r.h);
-  ctx.strokeStyle = border;
+  ctx.strokeStyle = neon;
+  ctx.shadowColor = neon;
+  ctx.shadowBlur = 12;
   ctx.lineWidth = 2;
   ctx.strokeRect(r.x + 1, r.y + 1, r.w - 2, r.h - 2);
+  ctx.restore();
 
-  ctx.fillStyle = text;
+  ctx.fillStyle = neon;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.font = 'bold 24px system-ui, sans-serif';
   ctx.fillText(label, r.x + r.w / 2, r.y + r.h / 2 - 8);
   ctx.font = '13px system-ui, sans-serif';
-  ctx.fillStyle = 'rgba(255,255,255,0.7)';
+  ctx.fillStyle = 'rgba(200, 220, 255, 0.65)';
   ctx.fillText(sub, r.x + r.w / 2, r.y + r.h / 2 + 16);
 }

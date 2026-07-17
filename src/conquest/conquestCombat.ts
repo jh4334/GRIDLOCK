@@ -10,6 +10,7 @@ import conquestData from '../data/conquest.json';
 import { findPath } from '../systems/astar';
 import { cellCenter } from '../game/grid';
 import { walkableNeighbors } from './conquestMap';
+import { drawProjectile } from '../render/fx';
 import type { ConquestGrid } from './conquestMap';
 import type { CombatUnit, Combatant, Pt } from './combatUnit';
 import type { Building } from './building';
@@ -27,6 +28,8 @@ export interface CombatHooks {
 interface Proj {
   x: number;
   y: number;
+  px: number; // 직전 위치(트레일 시작점).
+  py: number;
   speed: number;
   radius: number;
   color: string;
@@ -142,6 +145,8 @@ export class ConquestCombat {
       this.projectiles.push({
         x: b.x,
         y: b.y,
+        px: b.x,
+        py: b.y,
         speed: T.projectileSpeed,
         radius: T.projectileRadius,
         color: b.side === 'player' ? T.playerProjectileColor : T.enemyProjectileColor,
@@ -171,6 +176,8 @@ export class ConquestCombat {
 
   private updateProjectiles(dt: number): void {
     for (const p of this.projectiles) {
+      p.px = p.x; // 이동 전 위치를 트레일 시작점으로.
+      p.py = p.y;
       if (p.target && !p.target.dead) {
         p.ax = p.target.x;
         p.ay = p.target.y;
@@ -206,12 +213,7 @@ export class ConquestCombat {
   }
 
   render(ctx: CanvasRenderingContext2D): void {
-    for (const p of this.projectiles) {
-      ctx.fillStyle = p.color;
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
-      ctx.fill();
-    }
+    for (const p of this.projectiles) drawProjectile(ctx, p.x, p.y, p.px, p.py, p.radius, p.color);
   }
 }
 

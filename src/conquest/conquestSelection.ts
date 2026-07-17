@@ -9,10 +9,10 @@ import type { HQ } from './hq';
 import type { CombatUnit } from './combatUnit';
 
 const CLICK_RADIUS = 16;
-const RING_COLOR = 'rgba(224, 179, 87, 0.95)';
-const UNIT_RING_COLOR = 'rgba(127, 208, 255, 0.95)';
-const DRAG_FILL = 'rgba(224, 179, 87, 0.12)';
-const DRAG_STROKE = 'rgba(224, 179, 87, 0.9)';
+const RING_COLOR = 'rgba(255, 201, 77, 0.95)'; // 일꾼 선택 링(앰버).
+const UNIT_RING_COLOR = 'rgba(57, 213, 255, 0.95)'; // 유닛 선택 링(시안).
+const DRAG_FILL = 'rgba(57, 213, 255, 0.10)';
+const DRAG_STROKE = 'rgba(57, 213, 255, 0.9)';
 const RING_GAP = 4;
 
 export type ClickResult = 'unit' | 'worker' | 'hq' | 'none';
@@ -127,8 +127,11 @@ export class ConquestSelection {
   // ── render(읽기 전용) ────────────────────────────────────────
   renderRings(ctx: CanvasRenderingContext2D): void {
     ctx.save();
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([4, 4]);
+    ctx.shadowBlur = 6;
     ctx.strokeStyle = UNIT_RING_COLOR;
+    ctx.shadowColor = UNIT_RING_COLOR;
     for (const u of this.units) {
       if (u.dead) continue;
       ctx.beginPath();
@@ -136,6 +139,7 @@ export class ConquestSelection {
       ctx.stroke();
     }
     ctx.strokeStyle = RING_COLOR;
+    ctx.shadowColor = RING_COLOR;
     for (const w of this.workers) {
       if (w.dead) continue;
       ctx.beginPath();

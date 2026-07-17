@@ -5,15 +5,13 @@
 // onProduce 콜백으로 일꾼을 스폰한다(코디네이터가 인구·위치를 처리). render는 읽기 전용.
 
 import { cellToPixel, cellCenter, TILE } from '../game/grid';
+import { drawReactor } from '../render/tileSprites';
+import { drawHpBar } from '../render/hpbar';
 
 export type Side = 'player' | 'enemy';
 
-const COLOR_PLAYER = '#3a78d0';
-const COLOR_ENEMY = '#c0433a';
-const COLOR_OUTLINE = '#0d0f14';
-const COLOR_HP_BG = '#000';
-const COLOR_HP = '#7fd0ff';
-const COLOR_HP_ENEMY = '#ff9a8a';
+const COLOR_HP = '#39d5ff';
+const COLOR_HP_ENEMY = '#ff4d6a';
 const HP_BAR_H = 5;
 const HP_BAR_GAP = 8;
 
@@ -89,21 +87,14 @@ export class HQ {
 
   render(ctx: CanvasRenderingContext2D): void {
     const { x, y } = cellToPixel(this.cx, this.cy);
-    ctx.fillStyle = this.side === 'player' ? COLOR_PLAYER : COLOR_ENEMY;
-    ctx.fillRect(x + 2, y + 2, TILE - 4, TILE - 4);
-    ctx.strokeStyle = COLOR_OUTLINE;
-    ctx.lineWidth = 2;
-    ctx.strokeRect(x + 2, y + 2, TILE - 4, TILE - 4);
+    // 코어 리액터 — 아군 시안 / 적 레드(tileSprites, 시간 기반 펄스·회전 링).
+    const center = cellCenter(this.cx, this.cy);
+    drawReactor(ctx, center.x, center.y, this.side === 'player' ? 'cyan' : 'red');
 
-    // HP바.
-    const ratio = Math.max(0, this.hp / this.maxHp);
+    // HP바(모서리 둥근 세련된 바).
+    const ratio = this.hp / this.maxHp;
     const barW = TILE - 4;
-    const bx = x + 2;
-    const by = y - HP_BAR_GAP - HP_BAR_H;
-    ctx.fillStyle = COLOR_HP_BG;
-    ctx.fillRect(bx - 1, by - 1, barW + 2, HP_BAR_H + 2);
-    ctx.fillStyle = this.side === 'player' ? COLOR_HP : COLOR_HP_ENEMY;
-    ctx.fillRect(bx, by, barW * ratio, HP_BAR_H);
+    drawHpBar(ctx, x + 2, y - HP_BAR_GAP - HP_BAR_H, barW, HP_BAR_H, ratio, this.side === 'player' ? COLOR_HP : COLOR_HP_ENEMY);
   }
 
   /** 선택 시 강조 테두리(읽기 전용). */

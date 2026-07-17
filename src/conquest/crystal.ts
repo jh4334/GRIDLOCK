@@ -3,11 +3,7 @@
 // render는 읽기 전용(다이아몬드형 + 잔량 비율에 따른 밝기).
 
 import { cellCenter } from '../game/grid';
-
-const COLOR_CRYSTAL = '#5be0d0';
-const COLOR_CRYSTAL_LOW = '#2f6b64';
-const COLOR_OUTLINE = '#0c1a1a';
-const HALF = 15; // 다이아몬드 반쪽 크기(px, 시각 상수).
+import { drawCrystal } from '../render/tileSprites';
 
 export class Crystal {
   readonly cx: number;
@@ -36,20 +32,7 @@ export class Crystal {
   render(ctx: CanvasRenderingContext2D): void {
     if (this.depleted) return;
     const { x, y } = cellCenter(this.cx, this.cy);
-    const ratio = this.amount / this.maxAmount;
-    // 잔량이 줄수록 어둡게 보간.
-    ctx.save();
-    ctx.beginPath();
-    ctx.moveTo(x, y - HALF);
-    ctx.lineTo(x + HALF, y);
-    ctx.lineTo(x, y + HALF);
-    ctx.lineTo(x - HALF, y);
-    ctx.closePath();
-    ctx.fillStyle = ratio > 0.2 ? COLOR_CRYSTAL : COLOR_CRYSTAL_LOW;
-    ctx.fill();
-    ctx.strokeStyle = COLOR_OUTLINE;
-    ctx.lineWidth = 2;
-    ctx.stroke();
-    ctx.restore();
+    // 민트 발광 다이아 — 잔량 비율로 밝기, 시간 기반 빛 펄스(tileSprites).
+    drawCrystal(ctx, x, y, this.amount / this.maxAmount);
   }
 }

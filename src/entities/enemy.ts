@@ -8,6 +8,8 @@
 import enemiesData from '../data/enemies.json';
 import { SPAWN, cellCenter, pixelToCell } from '../game/grid';
 import type { FlowField } from '../systems/pathfinding';
+import { drawEnemy, drawSlowOverlay, type EnemyVisualKind } from '../render/enemySprites';
+import { drawHpBar } from '../render/hpbar';
 
 export type EnemyKind = keyof typeof enemiesData;
 
@@ -24,12 +26,8 @@ interface EnemySpec {
 const EPS = 1e-6;
 
 // HP바 표시 상수(밸런스 아님, 시각 상수).
-const HP_BAR_HEIGHT = 4;
-const HP_BAR_GAP = 6; // 몸통 위 여백.
-
-// 슬로우 시각 표시(밸런스 아님, 시각 상수).
-const COLOR_SLOW_TINT = 'rgba(150, 220, 255, 0.35)';
-const COLOR_SLOW_RING = 'rgba(150, 220, 255, 0.9)';
+const HP_BAR_HEIGHT = 3;
+const HP_BAR_GAP = 7; // 몸통 위 여백.
 
 export class Enemy {
   readonly kind: EnemyKind;
@@ -49,6 +47,9 @@ export class Enemy {
   // 칸 중심 기준 픽셀 좌표.
   x: number;
   y: number;
+  // 이동 방향각(rad). update가 이동 벡터로 갱신하고 render가 몸통 회전에 쓴다(update/render 분리).
+  // 기본 0 = 오른쪽(기지 방향)을 앞으로.
+  facing = 0;
 
   // 현재 점유(막 떠난) 칸과 향하는 다음 칸.
   private cx: number;
@@ -120,6 +121,7 @@ export class Enemy {
       const ddx = target.x - this.x;
       const ddy = target.y - this.y;
       const d = Math.hypot(ddx, ddy);
+      if (d > EPS) this.facing = Math.atan2(ddy, ddx); // 이동 방향으로 몸통 회전(렌더용).
 
       if (d <= EPS) {
         // 이미 목표 칸 중심에 있음 → 칸 갱신 후 다음 방향 결정.
@@ -187,44 +189,25 @@ export class Enemy {
     this.pickNextTarget(field);
   }
 
-  // 렌더는 상태를 읽기만 한다(변경 없음).
+  // 렌더는 상태를 읽기만 한다(변경 없음). 몸통 스프라이트(방향 회전) + 슬로우 표시 + HP바.
   render(ctx: CanvasRenderingContext2D): void {
-    // 몸통.
-    ctx.fillStyle = this.color;
-    ctx.beginPath();
-    ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-    ctx.fill();
+    drawEnemy(ctx, this.kind as EnemyVisualKind, this.x, this.y, this.facing);
+    if (this.slowed) drawSlowOverlay(ctx, this.x, this.y, this.radius);
 
-    // 슬로우 표시 — 옅은 하늘색 틴트 + 테두리.
-    if (this.slowed) {
-      ctx.save();
-      ctx.fillStyle = COLOR_SLOW_TINT;
-      ctx.beginPath();
-      ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = COLOR_SLOW_RING;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(this.x, this.y, this.radius + 1, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.restore();
-    }
-
-    // HP바.
+    // HP바 — 얇고 둥근 세련된 바(비율에 따라 초록→빨강).
     const ratio = Math.max(0, this.hp / this.maxHp);
     const barW = this.radius * 2;
-    const bx = this.x - this.radius;
-    const by = this.y - this.radius - HP_BAR_GAP - HP_BAR_HEIGHT;
-
-    // 배경(검정 테두리).
-    ctx.fillStyle = '#000';
-    ctx.fillRect(bx - 1, by - 1, barW + 2, HP_BAR_HEIGHT + 2);
-
-    // 체력(비율에 따라 초록→빨강).
     const r = Math.round(255 * (1 - ratio));
     const g = Math.round(255 * ratio);
-    ctx.fillStyle = `rgb(${r}, ${g}, 60)`;
-    ctx.fillRect(bx, by, barW * ratio, HP_BAR_HEIGHT);
+    drawHpBar(
+      ctx,
+      this.x - this.radius,
+      this.y - this.radius - HP_BAR_GAP - HP_BAR_HEIGHT,
+      barW,
+      HP_BAR_HEIGHT,
+      ratio,
+      `rgb(${r}, ${g}, 90)`,
+    );
   }
 }
 

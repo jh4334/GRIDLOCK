@@ -10,6 +10,8 @@
 
 import { cellCenter, pixelToCell } from '../game/grid';
 import { findPath } from '../systems/astar';
+import { drawWorker } from '../render/unitSprites';
+import { drawHpBar } from '../render/hpbar';
 import { walkableNeighbors } from './conquestMap';
 import type { ConquestGrid } from './conquestMap';
 import type { Crystal } from './crystal';
@@ -27,11 +29,8 @@ export interface WorkerContext {
   onBuildComplete(b: Building): void; // 건설 완료 시 부수효과 처리(배럭 생성/보급고 인구).
 }
 
-const COLOR_BODY = '#e0b357';
-const COLOR_OUTLINE = '#4a3a12';
-const COLOR_CARRY = '#5be0d0';
 const HP_BAR_H = 3;
-const HP_BAR_GAP = 5;
+const HP_BAR_GAP = 6;
 
 type Pt = { x: number; y: number };
 
@@ -47,6 +46,7 @@ export class Worker {
 
   state: WorkerState = 'idle';
   dead = false;
+  facing = 0; // 이동 방향각(rad) — moveToward가 갱신, render가 클로 회전에 사용.
 
   private path: Pt[] = []; // A* 웨이포인트(칸 중심). 앞에서부터 소비.
   private targetCrystal: Crystal | null = null;
@@ -75,6 +75,7 @@ export class Worker {
     const dy = ty - this.y;
     const d = Math.hypot(dx, dy);
     const step = this.speed * dt;
+    if (d > 0) this.facing = Math.atan2(dy, dx); // 이동 방향으로 클로 회전(렌더용).
     if (d <= step || d === 0) {
       this.x = tx;
       this.y = ty;
@@ -218,31 +219,18 @@ export class Worker {
 
   // ── render(읽기 전용) ────────────────────────────────────────
   render(ctx: CanvasRenderingContext2D): void {
-    ctx.fillStyle = COLOR_BODY;
-    ctx.strokeStyle = COLOR_OUTLINE;
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-
-    // 크리스탈 운반 표시 — 작은 점.
-    if (this.carrying > 0) {
-      ctx.fillStyle = COLOR_CARRY;
-      ctx.beginPath();
-      ctx.arc(this.x, this.y - this.radius - 3, 3, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
+    // 앰버 코어 + 수집 클로(facing 회전) + 운반 표시(민트 점).
+    drawWorker(ctx, this.x, this.y, this.facing, this.radius, this.carrying > 0);
     if (this.hp < this.maxHp) {
-      const ratio = Math.max(0, this.hp / this.maxHp);
-      const barW = this.radius * 2;
-      const bx = this.x - this.radius;
-      const by = this.y - this.radius - HP_BAR_GAP - HP_BAR_H;
-      ctx.fillStyle = '#000';
-      ctx.fillRect(bx - 1, by - 1, barW + 2, HP_BAR_H + 2);
-      ctx.fillStyle = '#7fd0ff';
-      ctx.fillRect(bx, by, barW * ratio, HP_BAR_H);
+      drawHpBar(
+        ctx,
+        this.x - this.radius,
+        this.y - this.radius - HP_BAR_GAP - HP_BAR_H,
+        this.radius * 2,
+        HP_BAR_H,
+        this.hp / this.maxHp,
+        '#39d5ff',
+      );
     }
   }
 }

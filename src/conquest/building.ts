@@ -8,23 +8,13 @@
 // update/render 분리: advance(dt)만 진행도를 바꾸고 render는 읽기 전용.
 
 import { cellToPixel, cellCenter, TILE } from '../game/grid';
-import { towerSpec } from '../entities/tower';
+import { drawBuilding, drawConstruction, drawBuildingSelect } from '../render/buildingSprites';
+import { drawHpBar } from '../render/hpbar';
+import { ALLY_CYAN, FOE_RED } from '../render/palette';
 import type { Side } from './hq';
 
 export type BuildKind = 'barracks' | 'turret' | 'depot';
 
-// 종류별 색(시각 상수). 배럭·포탑은 기존 타워 스펙 색을 재사용한다.
-const COLOR: Record<BuildKind, string> = {
-  barracks: towerSpec('barracks').color,
-  turret: towerSpec('arrow').color,
-  depot: '#c9a24b',
-};
-const SIDE_BORDER: Record<Side, string> = { player: '#3a78d0', enemy: '#c0433a' };
-const COLOR_CONSTRUCT = '#6a6a72';
-const PROGRESS_BG = '#000';
-const PROGRESS_FG = '#7bd67b';
-const INSET = 4;
-const BAR_H = 4;
 const HP_BAR_H = 4;
 const HP_BAR_GAP = 7;
 
@@ -112,43 +102,16 @@ export class Building {
 
   render(ctx: CanvasRenderingContext2D, selected: boolean): void {
     const { x, y } = cellToPixel(this.cx, this.cy);
-    const size = TILE - INSET * 2;
-    ctx.save();
     if (!this.done) {
-      // 건설 중 — 회색 반투명 + 진행 바.
-      ctx.globalAlpha = 0.5;
-      ctx.fillStyle = COLOR_CONSTRUCT;
-      ctx.fillRect(x + INSET, y + INSET, size, size);
-      ctx.globalAlpha = 1;
-      const by = y + TILE - INSET - BAR_H - 2;
-      ctx.fillStyle = PROGRESS_BG;
-      ctx.fillRect(x + INSET - 1, by - 1, size + 2, BAR_H + 2);
-      ctx.fillStyle = PROGRESS_FG;
-      ctx.fillRect(x + INSET, by, size * this.progressRatio, BAR_H);
+      // 건설 중 — 홀로그램 와이어프레임(청사진) + 진행 바.
+      drawConstruction(ctx, this.kind, x, y, this.progressRatio);
     } else {
-      ctx.fillStyle = COLOR[this.kind];
-      ctx.fillRect(x + INSET, y + INSET, size, size);
-      ctx.strokeStyle = SIDE_BORDER[this.side]; // 진영 구분 테두리.
-      ctx.lineWidth = 2.5;
-      ctx.strokeRect(x + INSET, y + INSET, size, size);
-      if (this.hp < this.maxHp) this.renderHpBar(ctx, x, y); // 손상 시에만 HP바.
+      drawBuilding(ctx, this.kind, this.side, x, y);
+      if (this.hp < this.maxHp) {
+        // 손상 시에만 HP바.
+        drawHpBar(ctx, x + 4, y - HP_BAR_GAP - HP_BAR_H, TILE - 8, HP_BAR_H, this.hp / this.maxHp, this.side === 'player' ? ALLY_CYAN : FOE_RED);
+      }
     }
-    if (selected) {
-      ctx.strokeStyle = '#ffe066';
-      ctx.lineWidth = 2;
-      ctx.strokeRect(x + 1.5, y + 1.5, TILE - 3, TILE - 3);
-    }
-    ctx.restore();
-  }
-
-  private renderHpBar(ctx: CanvasRenderingContext2D, x: number, y: number): void {
-    const ratio = Math.max(0, this.hp / this.maxHp);
-    const barW = TILE - INSET * 2;
-    const bx = x + INSET;
-    const by = y - HP_BAR_GAP - HP_BAR_H;
-    ctx.fillStyle = '#000';
-    ctx.fillRect(bx - 1, by - 1, barW + 2, HP_BAR_H + 2);
-    ctx.fillStyle = this.side === 'player' ? '#7fd0ff' : '#ff9a8a';
-    ctx.fillRect(bx, by, barW * ratio, HP_BAR_H);
+    if (selected) drawBuildingSelect(ctx, x, y);
   }
 }

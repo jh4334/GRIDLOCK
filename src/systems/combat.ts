@@ -12,10 +12,11 @@ import type { Economy } from '../game/economy';
 import type { FlowField } from './pathfinding';
 import { Projectile } from '../entities/projectile';
 import { cellCenter } from '../game/grid';
+import { drawExplosionRing } from '../render/fx';
 
 // 캐논 폭발 시각효과(밸런스 아님, 시각 상수). 파티클 시스템은 M6이므로 최소한만.
 const EXPLOSION_DURATION = 0.2; // 확장·페이드 지속(초).
-const EXPLOSION_COLOR = '#ffb066';
+const EXPLOSION_COLOR = '#ffb04d';
 
 interface Explosion {
   x: number;
@@ -55,12 +56,15 @@ export class CombatSystem {
   private fireTowers(dt: number, towers: Tower[], enemies: Enemy[], field: FlowField): void {
     for (const t of towers) {
       if (t.isBarracks) continue; // 배럭은 투사체를 쏘지 않는다(M10).
-      if (t.cooldown > 0) t.cooldown -= dt;
-      if (t.cooldown > 0) continue;
 
       const center = cellCenter(t.cx, t.cy);
       // 사거리·공격력·슬로우 지속은 레벨 반영 실효 스탯 사용(M7 업그레이드).
+      // 조준 대상은 매 프레임 계산(포탑 회전용) — 발사 여부와 무관하게 aimAngle을 갱신한다.
       const target = this.pickTarget(center.x, center.y, t.effectiveRange, enemies, field);
+      if (target) t.aimAngle = Math.atan2(target.y - center.y, target.x - center.x);
+
+      if (t.cooldown > 0) t.cooldown -= dt;
+      if (t.cooldown > 0) continue;
       if (!target) continue;
 
       this.projectiles.push(
@@ -157,14 +161,7 @@ export class CombatSystem {
     for (const ex of this.explosions) {
       const life = ex.timer / EXPLOSION_DURATION; // 1 → 0.
       const progress = 1 - life; // 0 → 1 (반경 확장).
-      ctx.save();
-      ctx.globalAlpha = life * 0.7; // 시간에 따라 페이드아웃.
-      ctx.strokeStyle = EXPLOSION_COLOR;
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.arc(ex.x, ex.y, ex.radius * progress, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.restore();
+      drawExplosionRing(ctx, ex.x, ex.y, ex.radius * progress, life * 0.8, EXPLOSION_COLOR);
     }
 
     for (const p of this.projectiles) p.render(ctx);

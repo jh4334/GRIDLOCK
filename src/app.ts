@@ -10,6 +10,7 @@ import { MouseInput } from './core/input';
 import { Game } from './game/game';
 import { ConquestGame } from './conquest/conquestGame';
 import { renderTitle, hitTitleButton } from './ui/title';
+import { tickClock } from './render/sprites';
 
 type Mode = 'title' | 'defense' | 'conquest';
 
@@ -61,6 +62,7 @@ export class App {
   }
 
   private update(dt: number): void {
+    tickClock(dt); // 스프라이트 애니메이션 공용 시계(포털·리액터·크리스탈 펄스) 진행.
     if (this.mode === 'defense') this.game.update(dt);
     else if (this.mode === 'conquest') this.conquest.update(dt);
   }

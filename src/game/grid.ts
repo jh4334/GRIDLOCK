@@ -8,6 +8,9 @@ export const COLS = 20;
 export const ROWS = 14;
 export const TILE = 48;
 
+// 회로 바닥·스폰 포털·기지 리액터 스프라이트(NEON GRID 아트 패스).
+import { paintCircuitFloor, drawPortal, drawReactor } from '../render/tileSprites';
+
 // 스폰: 좌측 중앙 / 기지: 우측 중앙.
 export const SPAWN = { cx: 0, cy: 7 } as const;
 export const BASE = { cx: COLS - 1, cy: 7 } as const;
@@ -15,11 +18,8 @@ export const BASE = { cx: COLS - 1, cy: 7 } as const;
 // 칸 상태 — M1에서는 빈 칸/타워 두 종류. 스폰·기지는 별도 특수 칸으로 표시한다.
 export type CellState = 'empty' | 'tower';
 
-// 정적 렌더 색상 (밸런스가 아닌 시각 상수).
-const COLOR_FLOOR = '#202028';
-const COLOR_GRID_LINE = 'rgba(255, 255, 255, 0.06)';
-const COLOR_SPAWN = '#1f7a8c'; // 청록
-const COLOR_BASE = '#d99423'; // 금빛 주황
+// NEON GRID 바닥 베이스색(밸런스 아닌 시각 상수). 회로 패턴·격자선은 tileSprites가 그린다.
+const COLOR_FLOOR = '#12172a';
 
 // ── 좌표 변환 유틸 ─────────────────────────────────────────────
 // 인자 px, py 는 이미 캔버스 픽셀 좌표계로 보정된 값이어야 한다 (core/input.ts 참고).
@@ -98,40 +98,17 @@ export class Grid {
     const c = layer.getContext('2d');
     if (!c) throw new Error('오프스크린 Canvas 2D context를 얻을 수 없습니다.');
 
-    // 바닥
-    c.fillStyle = COLOR_FLOOR;
-    c.fillRect(0, 0, layer.width, layer.height);
-
-    // 스폰/기지 특수 칸
-    const spawn = cellToPixel(SPAWN.cx, SPAWN.cy);
-    c.fillStyle = COLOR_SPAWN;
-    c.fillRect(spawn.x, spawn.y, TILE, TILE);
-
-    const base = cellToPixel(BASE.cx, BASE.cy);
-    c.fillStyle = COLOR_BASE;
-    c.fillRect(base.x, base.y, TILE, TILE);
-
-    // 격자선 — 칸 경계마다 옅은 선.
-    c.strokeStyle = COLOR_GRID_LINE;
-    c.lineWidth = 1;
-    c.beginPath();
-    for (let cx = 0; cx <= COLS; cx++) {
-      const x = cx * TILE + 0.5; // 0.5 오프셋으로 1px 선이 뭉개지지 않게.
-      c.moveTo(x, 0);
-      c.lineTo(x, layer.height);
-    }
-    for (let cy = 0; cy <= ROWS; cy++) {
-      const y = cy * TILE + 0.5;
-      c.moveTo(0, y);
-      c.lineTo(layer.width, y);
-    }
-    c.stroke();
-
+    // 회로기판 바닥 + 옅은 격자선(1회 프리렌더). 스폰/기지는 애니메이션이라 render에서 동적으로.
+    paintCircuitFloor(c, COLS, ROWS, COLOR_FLOOR);
     return layer;
   }
 
-  /** 프리렌더한 정적 레이어를 매 프레임 통째로 찍는다 (상태 변경 없음). */
+  /** 정적 바닥 + 동적 스폰 포털/기지 리액터(시간 기반 펄스)를 그린다 (상태 변경 없음). */
   render(ctx: CanvasRenderingContext2D): void {
     ctx.drawImage(this.staticLayer, 0, 0);
+    const spawn = cellCenter(SPAWN.cx, SPAWN.cy);
+    drawPortal(ctx, spawn.x, spawn.y);
+    const base = cellCenter(BASE.cx, BASE.cy);
+    drawReactor(ctx, base.x, base.y, 'cyan');
   }
 }

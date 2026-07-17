@@ -6,6 +6,7 @@
 
 import towersData from '../data/towers.json';
 import { TILE, cellToPixel } from '../game/grid';
+import { drawTower, drawSelectRing, drawRangeRing, type TowerVisualKind } from '../render/towerSprites';
 
 export type TowerKind = keyof typeof towersData.towers;
 
@@ -55,15 +56,8 @@ export function towerSpec(kind: TowerKind): TowerSpec {
   return towersData.towers[kind] as TowerSpec;
 }
 
-// 칸 안쪽 여백(시각 상수) — 격자선이 보이도록 칸을 꽉 채우지 않고 살짝 줄인다.
-// 고스트 미리보기도 같은 여백을 써서 설치 후 모습과 일치시킨다.
+// 칸 안쪽 여백(시각 상수) — 고스트 미리보기와 설치 후 모습의 여백을 맞추는 데만 쓴다.
 export const TOWER_INSET = 4;
-const COLOR_SELECT_RING = '#ffe066';
-// 레벨 표시(시각 상수) — 타워 상단에 레벨 수만큼 작은 점을 찍는다.
-const LEVEL_PIP_RADIUS = 2;
-const LEVEL_PIP_GAP = 6;
-const COLOR_LEVEL_PIP = '#ffe066';
-const COLOR_RANGE_RING = 'rgba(255, 224, 102, 0.5)'; // 선택 시 실효 사거리 원.
 
 export class Tower {
   readonly kind: TowerKind;
@@ -76,6 +70,9 @@ export class Tower {
   invested: number;
   // 발사 쿨다운(초). 0 이하면 발사 가능. combat 시스템이 감소·갱신한다.
   cooldown = 0;
+  // 마지막으로 조준한 방향(rad). combat이 매 프레임 사거리 내 대상 방향으로 갱신하고,
+  // render는 포탑을 이 각도로 회전시킨다(update/render 분리). 기본 0 = 기지(오른쪽) 방향.
+  aimAngle = 0;
 
   constructor(kind: TowerKind, cx: number, cy: number) {
     this.kind = kind;
@@ -126,48 +123,16 @@ export class Tower {
     this.level += 1;
   }
 
-  // 렌더는 상태를 읽기만 한다(변경 없음). selected면 선택 링을 덧그린다.
+  // 렌더는 상태를 읽기만 한다(변경 없음). 베이스+회전 포탑 스프라이트 + 레벨 마커 + 선택 링.
   render(ctx: CanvasRenderingContext2D, selected: boolean): void {
     const { x, y } = cellToPixel(this.cx, this.cy);
-    const size = TILE - TOWER_INSET * 2;
-    ctx.fillStyle = this.spec.color;
-    ctx.fillRect(x + TOWER_INSET, y + TOWER_INSET, size, size);
-
-    // 레벨 점 — 상단 가운데에 레벨 수만큼(1~3) 나란히.
-    this.renderLevelPips(ctx, x, y);
-
-    if (selected) {
-      ctx.save();
-      ctx.strokeStyle = COLOR_SELECT_RING;
-      ctx.lineWidth = 2;
-      ctx.strokeRect(x + 2.5, y + 2.5, TILE - 5, TILE - 5);
-      ctx.restore();
-    }
+    drawTower(ctx, this.kind as TowerVisualKind, this.level, x + TILE / 2, y + TILE / 2, this.aimAngle);
+    if (selected) drawSelectRing(ctx, x, y);
   }
 
-  private renderLevelPips(ctx: CanvasRenderingContext2D, x: number, y: number): void {
-    ctx.save();
-    ctx.fillStyle = COLOR_LEVEL_PIP;
-    const cx = x + TILE / 2;
-    const py = y + TOWER_INSET + LEVEL_PIP_RADIUS + 1;
-    const start = cx - ((this.level - 1) * LEVEL_PIP_GAP) / 2;
-    for (let i = 0; i < this.level; i++) {
-      ctx.beginPath();
-      ctx.arc(start + i * LEVEL_PIP_GAP, py, LEVEL_PIP_RADIUS, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    ctx.restore();
-  }
-
-  /** 선택 시 캔버스에 표시하는 실효 사거리 원(읽기 전용). */
+  /** 선택 시 캔버스에 표시하는 실효 사거리 원(점선 네온, 읽기 전용). */
   renderRange(ctx: CanvasRenderingContext2D): void {
     const { x, y } = cellToPixel(this.cx, this.cy);
-    ctx.save();
-    ctx.strokeStyle = COLOR_RANGE_RING;
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(x + TILE / 2, y + TILE / 2, this.effectiveRange, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.restore();
+    drawRangeRing(ctx, x + TILE / 2, y + TILE / 2, this.effectiveRange);
   }
 }

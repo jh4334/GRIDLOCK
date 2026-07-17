@@ -5,12 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>GRIDLOCK</title>
     <style>
+      /* NEON GRID — 다크 네이비 + 네온 글로우 UI 테마. */
       html,
       body {
         margin: 0;
         padding: 0;
-        background: #1a1a1f;
-        color: #e0e0e0;
+        background: radial-gradient(circle at 50% 20%, #161b27 0%, #0d1117 70%);
+        color: #cdd7e5;
         font-family: system-ui, sans-serif;
       }
       #app {
@@ -20,8 +21,10 @@
         padding-top: 16px;
       }
       #game-canvas {
-        background: #24242c;
-        image-rendering: pixelated;
+        background: #0d1117;
+        border: 1px solid rgba(57, 213, 255, 0.25);
+        border-radius: 4px;
+        box-shadow: 0 0 24px rgba(57, 213, 255, 0.12);
       }
       #controls,
       #conquest-controls {
@@ -32,23 +35,34 @@
         gap: 12px;
         width: 960px;
       }
-      .next-wave-btn {
-        padding: 8px 18px;
-        background: #2e5a7a;
-        color: #e6f2ff;
-        border: 2px solid #4080a8;
-        border-radius: 6px;
+      /* 공용 네온 버튼 베이스. */
+      .next-wave-btn,
+      .speed-btn,
+      .restart-btn,
+      .to-title-btn,
+      .tower-btn,
+      .upgrade-btn,
+      .sell-btn {
         font-family: inherit;
         font-size: 14px;
         cursor: pointer;
+        background: rgba(20, 28, 44, 0.85);
+        color: #cfe4ff;
+        border: 1px solid rgba(120, 170, 230, 0.35);
+        border-radius: 6px;
+        transition: box-shadow 0.15s, border-color 0.15s, background 0.15s;
+      }
+      .next-wave-btn {
+        padding: 8px 18px;
+        border-color: rgba(57, 213, 255, 0.55);
       }
       .next-wave-btn:hover:not(:disabled) {
-        background: #33668a;
+        box-shadow: 0 0 12px rgba(57, 213, 255, 0.5);
+        border-color: #39d5ff;
       }
       .next-wave-btn:disabled {
-        color: #6a6a72;
-        background: #24242a;
-        border-color: #3a3a46;
+        color: #4a5468;
+        border-color: rgba(80, 96, 120, 0.3);
         cursor: not-allowed;
       }
       .speed-group {
@@ -58,47 +72,32 @@
       .speed-btn {
         min-width: 40px;
         padding: 8px 10px;
-        background: #2c2c36;
-        color: #e0e0e0;
-        border: 2px solid #3a3a46;
-        border-radius: 6px;
-        font-family: inherit;
-        font-size: 14px;
-        cursor: pointer;
       }
       .speed-btn:hover {
-        border-color: #6a6a7a;
+        border-color: #39d5ff;
+        box-shadow: 0 0 10px rgba(57, 213, 255, 0.35);
       }
       .speed-btn.active {
-        border-color: #7bd67b;
-        background: #33413a;
-        color: #d8ffd8;
+        border-color: #4dffd5;
+        background: rgba(28, 60, 54, 0.9);
+        color: #d8fff5;
+        box-shadow: 0 0 12px rgba(77, 255, 213, 0.4);
       }
       .restart-btn {
         padding: 8px 18px;
-        background: #7a2e2e;
-        color: #ffe0e0;
-        border: 2px solid #a04040;
-        border-radius: 6px;
-        font-family: inherit;
-        font-size: 14px;
-        cursor: pointer;
+        border-color: rgba(255, 77, 106, 0.55);
+        color: #ffd7de;
       }
       .restart-btn:hover {
-        background: #993333;
+        box-shadow: 0 0 12px rgba(255, 77, 106, 0.5);
+        border-color: #ff4d6a;
       }
       .to-title-btn {
         padding: 8px 18px;
-        background: #2c2c36;
-        color: #e0e0e0;
-        border: 2px solid #4a4a58;
-        border-radius: 6px;
-        font-family: inherit;
-        font-size: 14px;
-        cursor: pointer;
       }
       .to-title-btn:hover {
-        background: #363642;
+        border-color: #8fb4e6;
+        box-shadow: 0 0 10px rgba(143, 180, 230, 0.35);
       }
       #build-menu,
       #conquest-menu {
@@ -120,33 +119,30 @@
         gap: 2px;
         min-width: 84px;
         padding: 8px 12px;
-        background: #2c2c36;
-        color: #e0e0e0;
-        border: 2px solid #3a3a46;
-        border-radius: 6px;
-        font-family: inherit;
-        font-size: 14px;
-        cursor: pointer;
       }
       .tower-btn .t-cost {
-        color: #ffd166;
+        color: #ffc94d;
         font-size: 12px;
       }
       .tower-btn:hover:not(:disabled) {
-        border-color: #6a6a7a;
+        border-color: #39d5ff;
+        box-shadow: 0 0 10px rgba(57, 213, 255, 0.35);
       }
       .tower-btn.active {
-        border-color: #7bd67b;
-        background: #33413a;
+        border-color: #4dffd5;
+        background: rgba(28, 60, 54, 0.9);
+        box-shadow: 0 0 12px rgba(77, 255, 213, 0.4);
       }
       .tower-btn.unaffordable,
       .tower-btn:disabled {
-        color: #6a6a72;
-        background: #24242a;
+        color: #4a5468;
+        background: rgba(16, 22, 34, 0.8);
+        border-color: rgba(80, 96, 120, 0.3);
         cursor: not-allowed;
+        box-shadow: none;
       }
       .tower-btn.unaffordable .t-cost {
-        color: #7a6a3a;
+        color: #6a5a30;
       }
       .tower-panel-slot {
         min-height: 92px;
@@ -159,20 +155,21 @@
         align-items: center;
         gap: 8px;
         padding: 10px 16px;
-        background: #24242c;
-        border: 2px solid #3a3a46;
+        background: rgba(18, 24, 38, 0.9);
+        border: 1px solid rgba(57, 213, 255, 0.3);
         border-radius: 8px;
+        box-shadow: 0 0 16px rgba(57, 213, 255, 0.1);
       }
       .tp-title {
         font-size: 15px;
         font-weight: 600;
-        color: #ffe066;
+        color: #ffc94d;
       }
       .tp-stats {
         display: flex;
         gap: 14px;
         font-size: 13px;
-        color: #c8c8d0;
+        color: #a8bcd6;
       }
       .tp-actions {
         display: flex;
@@ -180,35 +177,26 @@
       }
       .upgrade-btn {
         padding: 8px 16px;
-        background: #2e6a3a;
-        color: #e0ffe6;
-        border: 2px solid #3f9450;
-        border-radius: 6px;
-        font-family: inherit;
-        font-size: 14px;
-        cursor: pointer;
+        border-color: rgba(77, 255, 213, 0.5);
+        color: #d8fff5;
       }
       .upgrade-btn:hover:not(:disabled) {
-        background: #338044;
+        box-shadow: 0 0 12px rgba(77, 255, 213, 0.45);
+        border-color: #4dffd5;
       }
       .upgrade-btn:disabled {
-        color: #6a6a72;
-        background: #24242a;
-        border-color: #3a3a46;
+        color: #4a5468;
+        border-color: rgba(80, 96, 120, 0.3);
         cursor: not-allowed;
       }
       .sell-btn {
         padding: 8px 16px;
-        background: #7a2e2e;
-        color: #ffe0e0;
-        border: 2px solid #a04040;
-        border-radius: 6px;
-        font-family: inherit;
-        font-size: 14px;
-        cursor: pointer;
+        border-color: rgba(255, 77, 106, 0.5);
+        color: #ffd7de;
       }
       .sell-btn:hover {
-        background: #993333;
+        box-shadow: 0 0 12px rgba(255, 77, 106, 0.45);
+        border-color: #ff4d6a;
       }
     </style>
   </head>

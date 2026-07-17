@@ -7,6 +7,7 @@
 // 대상이 먼저 죽으면 target을 놓고 마지막으로 알던 위치로 직진해 소멸한다.
 
 import type { Enemy } from './enemy';
+import { drawProjectile } from '../render/fx';
 
 export interface ProjectileInit {
   x: number;
@@ -40,9 +41,15 @@ export class Projectile {
   arrived = false; // 대상/목표 지점 도달 → combat이 효과 해석에 사용.
   dead = false; // 명중(또는 소멸) → 프레임 끝 filter로 제거.
 
+  // 트레일용 직전 위치(update가 이동 전에 갱신, render가 페이드 꼬리에 사용).
+  private px: number;
+  private py: number;
+
   constructor(init: ProjectileInit) {
     this.x = init.x;
     this.y = init.y;
+    this.px = init.x;
+    this.py = init.y;
     this.speed = init.speed;
     this.radius = init.radius;
     this.color = init.color;
@@ -58,6 +65,8 @@ export class Projectile {
   // 대상이 살아있으면 그 위치로, 죽었으면 마지막 위치로 유도 이동.
   update(dt: number): void {
     if (this.dead) return;
+    this.px = this.x; // 이동 전 위치를 트레일 시작점으로 기록.
+    this.py = this.y;
 
     if (this.target && !this.target.dead && !this.target.reachedBase) {
       this.aimX = this.target.x;
@@ -90,11 +99,8 @@ export class Projectile {
     return this.target;
   }
 
-  // 렌더는 상태를 읽기만 한다(변경 없음). 작은 원으로 표시.
+  // 렌더는 상태를 읽기만 한다(변경 없음). 발광 코어 + 페이드 트레일.
   render(ctx: CanvasRenderingContext2D): void {
-    ctx.fillStyle = this.color;
-    ctx.beginPath();
-    ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-    ctx.fill();
+    drawProjectile(ctx, this.x, this.y, this.px, this.py, this.radius, this.color);
   }
 }

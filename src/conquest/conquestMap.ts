@@ -6,12 +6,12 @@
 // 정적 레이어(바닥+격자)만 프리렌더하고, 크리스탈·본진·건물은 동적 엔티티가 직접 그린다.
 
 import { COLS, ROWS, TILE, cellToPixel } from '../game/grid';
+import { paintCircuitFloor } from '../render/tileSprites';
 import type { PathGrid } from '../systems/astar';
 
 export type ConquestCell = 'empty' | 'crystal' | 'wall';
 
-const COLOR_FLOOR = '#1e2228';
-const COLOR_GRID_LINE = 'rgba(255, 255, 255, 0.05)';
+const COLOR_FLOOR = '#141a2e'; // 정복 바닥(디펜스보다 살짝 푸른 톤).
 
 export class ConquestGrid implements PathGrid {
   readonly cols = COLS;
@@ -60,23 +60,7 @@ export class ConquestGrid implements PathGrid {
     const c = layer.getContext('2d');
     if (!c) throw new Error('오프스크린 Canvas 2D context를 얻을 수 없습니다.');
 
-    c.fillStyle = COLOR_FLOOR;
-    c.fillRect(0, 0, layer.width, layer.height);
-
-    c.strokeStyle = COLOR_GRID_LINE;
-    c.lineWidth = 1;
-    c.beginPath();
-    for (let cx = 0; cx <= COLS; cx++) {
-      const x = cx * TILE + 0.5;
-      c.moveTo(x, 0);
-      c.lineTo(x, layer.height);
-    }
-    for (let cy = 0; cy <= ROWS; cy++) {
-      const y = cy * TILE + 0.5;
-      c.moveTo(0, y);
-      c.lineTo(layer.width, y);
-    }
-    c.stroke();
+    paintCircuitFloor(c, COLS, ROWS, COLOR_FLOOR);
     return layer;
   }
 

@@ -6,6 +6,9 @@
 // 사거리 내 적 Combatant를 향해 이동해 접촉 시 공격한다. 수치는 conquest.json에서 주입.
 
 import { pixelToCell } from '../game/grid';
+import { drawTrooper } from '../render/unitSprites';
+import { drawHpBar } from '../render/hpbar';
+import { ALLY_CYAN, FOE_ORANGE } from '../render/palette';
 import type { Side } from './hq';
 import type { Building } from './building';
 
@@ -33,9 +36,8 @@ export interface UnitStats {
 }
 
 // 유닛 렌더 상수(밸런스 아님, 시각 상수).
-const OUTLINE = '#12202e';
 const HP_BAR_H = 3;
-const HP_BAR_GAP = 5;
+const HP_BAR_GAP = 6;
 
 export class CombatUnit implements Combatant {
   readonly side: Side;
@@ -52,6 +54,7 @@ export class CombatUnit implements Combatant {
   readonly maxHp: number;
 
   dead = false;
+  facing = 0; // 이동 방향각(rad) — moveToward가 갱신, render가 쉐브론 회전에 사용.
   attackCooldown = 0; // 다음 공격까지 남은 시간(초). combat이 감소·갱신.
 
   // 명령 경로(A* 칸 중심 웨이포인트). 앞에서부터 소비. 비면 도착.
@@ -99,6 +102,7 @@ export class CombatUnit implements Combatant {
     const dy = ty - this.y;
     const d = Math.hypot(dx, dy);
     const step = this.speed * dt;
+    if (d > 0) this.facing = Math.atan2(dy, dx); // 이동 방향으로 쉐브론 회전(렌더용).
     if (d <= step || d === 0) {
       this.x = tx;
       this.y = ty;
@@ -117,23 +121,17 @@ export class CombatUnit implements Combatant {
     return this.path.length === 0;
   }
 
-  // 읽기 전용 렌더 — 진영 색 원 + 외곽선 + HP바.
+  // 읽기 전용 렌더 — 진영 코어 + 방향 쉐브론 스프라이트 + HP바.
   render(ctx: CanvasRenderingContext2D): void {
-    ctx.fillStyle = this.color;
-    ctx.strokeStyle = OUTLINE;
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-
-    const ratio = Math.max(0, this.hp / this.maxHp);
-    const barW = this.radius * 2;
-    const bx = this.x - this.radius;
-    const by = this.y - this.radius - HP_BAR_GAP - HP_BAR_H;
-    ctx.fillStyle = '#000';
-    ctx.fillRect(bx - 1, by - 1, barW + 2, HP_BAR_H + 2);
-    ctx.fillStyle = this.side === 'player' ? '#7fd0ff' : '#ff9a8a';
-    ctx.fillRect(bx, by, barW * ratio, HP_BAR_H);
+    drawTrooper(ctx, this.side === 'player' ? 'ally' : 'foe', this.x, this.y, this.facing, this.radius);
+    drawHpBar(
+      ctx,
+      this.x - this.radius,
+      this.y - this.radius - HP_BAR_GAP - HP_BAR_H,
+      this.radius * 2,
+      HP_BAR_H,
+      this.hp / this.maxHp,
+      this.side === 'player' ? ALLY_CYAN : FOE_ORANGE,
+    );
   }
 }
