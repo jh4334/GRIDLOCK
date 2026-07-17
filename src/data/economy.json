@@ -3,5 +3,5 @@
   "startLives": 20,
   "sellRefundRate": 0.7,
   "waveClearBase": 20,
-  "waveClearPerWave": 5
+  "waveClearPerWave": 8
 }

@@ -4,8 +4,8 @@
       "name": "애로우",
       "cost": 50,
       "range": 120,
-      "fireRate": 1.0,
-      "damage": 12,
+      "fireRate": 1,
+      "damage": 14,
       "color": "#5fb85f",
       "projectileSpeed": 400,
       "projectileRadius": 4,
@@ -28,7 +28,7 @@
       "cost": 70,
       "range": 110,
       "fireRate": 0.8,
-      "damage": 5,
+      "damage": 8,
       "slowFactor": 0.4,
       "slowDuration": 2,
       "color": "#4fb0d6",
@@ -50,7 +50,10 @@
   },
   "upgrade": {
     "maxLevel": 3,
-    "costFactors": [0.8, 1.2],
+    "costFactors": [
+      0.8,
+      1.2
+    ],
     "damageMult": 1.4,
     "rangeMult": 1.1,
     "slowDurationMult": 1.2
