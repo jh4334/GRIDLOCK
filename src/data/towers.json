@@ -9,7 +9,11 @@
       "color": "#5fb85f",
       "projectileSpeed": 400,
       "projectileRadius": 4,
-      "projectileColor": "#e9f5a0"
+      "projectileColor": "#e9f5a0",
+      "specials": [
+        { "id": "rapid", "name": "연사", "desc": "공속 ×1.8", "fireRateMult": 1.8 },
+        { "id": "pierce", "name": "관통", "desc": "최대 3기 관통(피해 70%)", "pierceCount": 3, "pierceFalloff": 0.7 }
+      ]
     },
     "cannon": {
       "name": "캐논",
@@ -21,7 +25,11 @@
       "color": "#c8623a",
       "projectileSpeed": 300,
       "projectileRadius": 6,
-      "projectileColor": "#f0a45a"
+      "projectileColor": "#f0a45a",
+      "specials": [
+        { "id": "bigblast", "name": "대폭발", "desc": "스플래시 반경 ×1.7, 피해 ×1.2", "splashRadiusMult": 1.7, "damageMult": 1.2 },
+        { "id": "napalm", "name": "잔류 화염", "desc": "명중 지점 2.5초 초당 12 화염", "napalmDps": 12, "napalmDuration": 2.5, "napalmRadius": 45 }
+      ]
     },
     "frost": {
       "name": "프로스트",
@@ -34,7 +42,11 @@
       "color": "#4fb0d6",
       "projectileSpeed": 240,
       "projectileRadius": 5,
-      "projectileColor": "#bfe8f7"
+      "projectileColor": "#bfe8f7",
+      "specials": [
+        { "id": "deepfreeze", "name": "빙결", "desc": "슬로우 60%·지속 ×1.5", "slowFactor": 0.6, "slowDurationMult": 1.5 },
+        { "id": "frostfield", "name": "광역화", "desc": "명중 지점 40px 광역 슬로우", "slowSplashRadius": 40 }
+      ]
     },
     "sniper": {
       "name": "스나이퍼",
@@ -45,7 +57,11 @@
       "color": "#9b4fd6",
       "projectileSpeed": 650,
       "projectileRadius": 4,
-      "projectileColor": "#e18cff"
+      "projectileColor": "#e18cff",
+      "specials": [
+        { "id": "execute", "name": "처형", "desc": "HP 25% 이하 즉사", "executeThreshold": 0.25 },
+        { "id": "doubleshot", "name": "이중 사격", "desc": "0.15초 간격 2연발", "burstCount": 2, "burstInterval": 0.15 }
+      ]
     },
     "barracks": {
       "name": "배럭",
@@ -79,6 +95,7 @@
     ],
     "damageMult": 1.4,
     "rangeMult": 1.1,
-    "slowDurationMult": 1.2
+    "slowDurationMult": 1.2,
+    "specialCostFactor": 1.5
   }
 }

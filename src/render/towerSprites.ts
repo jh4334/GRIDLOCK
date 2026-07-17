@@ -193,6 +193,30 @@ function drawLevelMarkers(ctx: CanvasRenderingContext2D, x: number, y: number, l
   }
 }
 
+/** 4레벨 스페셜 분기 표식(D4.2) — 레벨 마커 우상단에 작은 금색 별. (x,y)=칸 중심. */
+export function drawSpecialStar(ctx: CanvasRenderingContext2D, x: number, y: number): void {
+  const sx = x + S * 0.3; // 레벨 마커(상단 중앙) 오른쪽.
+  const sy = y - S * 0.34;
+  const rOut = 4;
+  const rIn = 1.8;
+  ctx.save();
+  ctx.fillStyle = GOLD;
+  ctx.shadowColor = GOLD;
+  ctx.shadowBlur = 6;
+  ctx.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const a = (i / 10) * Math.PI * 2 - Math.PI / 2;
+    const r = i % 2 === 0 ? rOut : rIn;
+    const px = sx + Math.cos(a) * r;
+    const py = sy + Math.sin(a) * r;
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
 /** 선택 네온 링(칸 테두리). (x,y)=칸 좌상단. */
 export function drawSelectRing(ctx: CanvasRenderingContext2D, x: number, y: number): void {
   ctx.save();

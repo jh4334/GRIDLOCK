@@ -129,6 +129,7 @@ export class Game {
       onSelectTower: (kind) => this.interaction.toggleTower(kind),
       onUpgrade: () => this.interaction.upgradeSelected(),
       onSell: () => this.interaction.sellSelected(),
+      onSpecial: (id) => this.interaction.chooseSpecial(id), // 4레벨 스페셜 분기(D4.2).
     });
     this.buildMenu.updateAffordability(this.economy.gold);
 
@@ -218,10 +219,7 @@ export class Game {
     this.waveManager.skip();
   }
 
-  private setSpeed(s: number): void {
-    this.speed = s;
-    this.controls.setActiveSpeed(s);
-  }
+  private setSpeed(s: number): void { this.speed = s; this.controls.setActiveSpeed(s); }
 
   // ── update / render ─────────────────────────────────────────
   // FPS·입력·플래시는 프레임당 1회, 월드 갱신은 배속만큼 반복(App이 디펜스 활성 프레임에만 호출).

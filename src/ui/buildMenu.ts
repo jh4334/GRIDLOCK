@@ -23,6 +23,13 @@ export interface SoldierPanelInfo {
   damage: number; // 병사 공격력(레벨 반영).
 }
 
+// 4레벨 스페셜 분기 버튼 정보(D4.2). 선택 가능 시 2개가 전달된다.
+export interface SpecialOption {
+  id: string;
+  name: string;
+  desc: string;
+}
+
 export interface TowerPanelInfo {
   name: string;
   level: number;
@@ -34,6 +41,11 @@ export interface TowerPanelInfo {
   upgradeCost: number | null; // null = 최대 레벨(업그레이드 버튼 비활성 + "최대 레벨").
   canAffordUpgrade: boolean; // 골드 충분 여부(업그레이드 버튼 활성 조건).
   refund: number; // 판매 시 환급 골드.
+  // ── 4레벨 스페셜 분기(D4.2) ──
+  specials?: SpecialOption[]; // 선택 가능할 때만(최대 레벨·미선택). 있으면 분기 버튼 2개 렌더.
+  specialCost?: number; // 분기 선택 비용(specials 있을 때).
+  canAffordSpecial?: boolean; // 골드 충분 여부(분기 버튼 활성 조건).
+  chosenSpecial?: SpecialOption | null; // 이미 선택된 분기 — 표시만.
 }
 
 interface BuildMenuConfig {
@@ -41,6 +53,7 @@ interface BuildMenuConfig {
   onSelectTower: (kind: TowerKind) => void;
   onUpgrade: () => void;
   onSell: () => void;
+  onSpecial: (id: string) => void; // 4레벨 스페셜 분기 선택(D4.2).
 }
 
 export class BuildMenu {
@@ -50,10 +63,12 @@ export class BuildMenu {
   private readonly root: HTMLElement;
   private readonly onUpgrade: () => void;
   private readonly onSell: () => void;
+  private readonly onSpecial: (id: string) => void;
 
   constructor(config: BuildMenuConfig) {
     this.onUpgrade = config.onUpgrade;
     this.onSell = config.onSell;
+    this.onSpecial = config.onSpecial;
 
     const root = document.getElementById('build-menu');
     if (!root) throw new Error('#build-menu 컨테이너를 찾을 수 없습니다.');
@@ -129,6 +144,8 @@ export class BuildMenu {
     }
     panel.appendChild(stats);
 
+    this.appendSpecialSection(panel, info); // 4레벨 스페셜 분기(D4.2) — 선택 UI 또는 선택 표시.
+
     const actions = document.createElement('div');
     actions.className = 'tp-actions';
 
@@ -152,5 +169,37 @@ export class BuildMenu {
 
     panel.appendChild(actions);
     this.panelSlot.appendChild(panel);
+  }
+
+  // 4레벨 스페셜 분기(D4.2) — 이미 선택했으면 선택 표시, 선택 가능하면 분기 버튼 2개(이름+소문구),
+  // 둘 다 아니면(레벨 미도달 등) 아무것도 그리지 않는다.
+  private appendSpecialSection(panel: HTMLElement, info: TowerPanelInfo): void {
+    if (info.chosenSpecial) {
+      const chosen = document.createElement('div');
+      chosen.className = 'tp-special-chosen';
+      chosen.textContent = `특화: ${info.chosenSpecial.name}`;
+      chosen.title = info.chosenSpecial.desc;
+      panel.appendChild(chosen);
+      return;
+    }
+    if (!info.specials || info.specials.length === 0) return;
+
+    const label = document.createElement('div');
+    label.className = 'tp-special-label';
+    label.textContent = `특화 선택 (${info.specialCost}G)`;
+    panel.appendChild(label);
+
+    const row = document.createElement('div');
+    row.className = 'tp-special-row';
+    for (const s of info.specials) {
+      const btn = document.createElement('button');
+      btn.className = 'special-btn';
+      btn.innerHTML = `<span class="s-name">${s.name}</span><span class="s-desc">${s.desc}</span>`;
+      btn.title = s.desc;
+      btn.disabled = !info.canAffordSpecial;
+      btn.addEventListener('click', () => this.onSpecial(s.id));
+      row.appendChild(btn);
+    }
+    panel.appendChild(row);
   }
 }

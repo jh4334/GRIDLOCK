@@ -1,7 +1,6 @@
 // 타워 설치/판매/선택 상호작용 — 마우스 클릭·호버, 설치 모드 고스트, 봉쇄 거부 플래시.
-// 배럭 전용 상호작용·렌더는 barracksInteraction.ts로 분리(M10). 동작 변화 없음.
-// 타워 배열과 선택/설치 모드 상태는 이 클래스가 소유하고, Game이 조율한다. 필드 재계산·적 목록은
-// Game 소유라 콜백/게터로 주입받는다. update/render 분리 — 상태 변경은 update 계열만, render는 읽기 전용.
+// 배럭 전용 상호작용·렌더는 barracksInteraction.ts로 분리(M10). 타워 배열·선택/설치 모드 상태는
+// 이 클래스가 소유하고 Game이 조율한다(필드 재계산·적 목록은 콜백/게터 주입). update/render 분리.
 
 import type { MouseInput } from '../core/input';
 import type { Grid } from './grid';
@@ -10,7 +9,7 @@ import type { Economy } from './economy';
 import type { Enemy } from '../entities/enemy';
 import { Tower, towerSpec, TowerKind } from '../entities/tower';
 import { drawTower, type TowerVisualKind } from '../render/towerSprites';
-import { barracksList, barracksPanelSig, setRallyFromClick, renderUnits, createTower, towerPanelInfo, sellRefund } from './barracksInteraction';
+import { barracksList, barracksPanelSig, setRallyFromClick, renderUnits, createTower, towerPanelInfo, sellRefund, chooseTowerSpecial } from './barracksInteraction';
 import { isCellPlaceable, isPathClear } from '../systems/placement';
 import { PathPreview } from './pathPreview';
 import type { BuildMenu } from '../ui/buildMenu';
@@ -145,6 +144,12 @@ export class Interaction {
     this.showPanel();
   }
 
+  /** 선택된 타워의 4레벨 스페셜 분기 선택(D4.2). 골드·가능 판단은 chooseTowerSpecial이 담당. */
+  chooseSpecial(id: string): void {
+    chooseTowerSpecial(this.deps.economy, this.selectedTower, id);
+    this.showPanel();
+  }
+
   // ── 클릭 처리 ────────────────────────────────────────────────
   handleClick(px: number, py: number): void {
     const { cx, cy } = pixelToCell(px, py);
@@ -200,12 +205,8 @@ export class Interaction {
 
   // ── update(상태 변경) — 호버 칸 + 설치 고스트 + 예상 경로 계산. render는 읽기만. ──
   updateHover(input: MouseInput): void {
-    if (input.isInside) {
-      const { cx, cy } = pixelToCell(input.x, input.y);
-      this.hoverCell = this.deps.grid.inBounds(cx, cy) ? { cx, cy } : null;
-    } else {
-      this.hoverCell = null;
-    }
+    const c = input.isInside ? pixelToCell(input.x, input.y) : null;
+    this.hoverCell = c && this.deps.grid.inBounds(c.cx, c.cy) ? { cx: c.cx, cy: c.cy } : null;
 
     if (this.placeKind && this.hoverCell) {
       const { cx, cy } = this.hoverCell;
@@ -213,8 +214,7 @@ export class Interaction {
     } else {
       this.ghost = null;
     }
-    // 예상 경로는 고스트를 따른다(유효 고스트일 때만·호버 칸 변경 시에만 재계산). 비설치·설치 확정·판매는
-    // 고스트가 null/무효가 되므로 sync가 자동 무효화한다(설치 확정 칸은 다음 프레임 tower → 무효 고스트).
+    // 예상 경로는 유효 고스트일 때만·호버 칸 변경 시에만 재계산(비설치·설치 확정·판매는 sync가 자동 무효화).
     this.preview.sync(this.deps.grid, this.ghost);
   }
 

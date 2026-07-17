@@ -9,6 +9,13 @@
 import type { Enemy } from './enemy';
 import { drawProjectile } from '../render/fx';
 
+// 명중 지점 화염 지대 정의(캐논 napalm, D4.2). combat이 명중 시 fireZone을 생성하는 데 쓴다.
+export interface NapalmPayload {
+  dps: number; // 초당 피해.
+  duration: number; // 지속(초).
+  radius: number; // 반경(px).
+}
+
 export interface ProjectileInit {
   x: number;
   y: number;
@@ -20,6 +27,13 @@ export interface ProjectileInit {
   splashRadius: number; // 0이면 단일 타격
   slowFactor: number; // 0이면 감속 없음
   slowDuration: number; // 초
+  // ── 4레벨 스페셜(D4.2) — 없으면 기본값(효과 없음) ──
+  pierceCount?: number; // >0이면 관통 모드(직진하며 최대 N기 타격).
+  pierceFalloff?: number; // 관통당 피해 배수(누적 지수). 기본 1.
+  executeThreshold?: number; // >0이면 대상 HP 비율이 이 값 이하일 때 즉사.
+  slowSplashRadius?: number; // >0이면 명중 지점 이 반경 내 광역 슬로우(frostfield).
+  napalm?: NapalmPayload | null; // 있으면 명중 지점에 잔류 화염 지대 생성.
+  maxTravel?: number; // 관통 모드 최대 비행 거리(px) — N기 미만 타격 시 소멸 보증.
 }
 
 export class Projectile {
@@ -32,6 +46,20 @@ export class Projectile {
   readonly splashRadius: number;
   readonly slowFactor: number;
   readonly slowDuration: number;
+
+  // ── 스페셜 효과 수치(D4.2) — combat이 명중 해석에서 읽는다. ──
+  readonly pierceCount: number;
+  readonly pierceFalloff: number;
+  readonly executeThreshold: number;
+  readonly slowSplashRadius: number;
+  readonly napalm: NapalmPayload | null;
+  // 관통 모드: 직진 방향(정규화)과 누적 비행 거리, 이미 타격한 적 집합(중복 타격 방지).
+  private readonly piercing: boolean;
+  private dirX = 0;
+  private dirY = 0;
+  private traveled = 0;
+  private readonly maxTravel: number;
+  readonly hitSet = new Set<Enemy>();
 
   // 대상이 죽으면 null이 되고, 마지막으로 알던 위치(aimX/aimY)로 직진한다.
   private target: Enemy | null;
@@ -57,9 +85,30 @@ export class Projectile {
     this.splashRadius = init.splashRadius;
     this.slowFactor = init.slowFactor;
     this.slowDuration = init.slowDuration;
+    this.pierceCount = init.pierceCount ?? 0;
+    this.pierceFalloff = init.pierceFalloff ?? 1;
+    this.executeThreshold = init.executeThreshold ?? 0;
+    this.slowSplashRadius = init.slowSplashRadius ?? 0;
+    this.napalm = init.napalm ?? null;
+    this.maxTravel = init.maxTravel ?? 0;
     this.target = init.target;
     this.aimX = init.target.x;
     this.aimY = init.target.y;
+
+    // 관통 모드: 발사 순간 대상 방향으로 직진 벡터를 고정하고, 이후 호밍하지 않는다.
+    this.piercing = this.pierceCount > 0;
+    if (this.piercing) {
+      const dx = init.target.x - init.x;
+      const dy = init.target.y - init.y;
+      const d = Math.hypot(dx, dy) || 1;
+      this.dirX = dx / d;
+      this.dirY = dy / d;
+    }
+  }
+
+  /** 관통 모드인가 — combat이 명중 해석 분기(직진·다중 타격)에 쓴다. */
+  get isPiercing(): boolean {
+    return this.piercing;
   }
 
   // 대상이 살아있으면 그 위치로, 죽었으면 마지막 위치로 유도 이동.
@@ -67,6 +116,17 @@ export class Projectile {
     if (this.dead) return;
     this.px = this.x; // 이동 전 위치를 트레일 시작점으로 기록.
     this.py = this.y;
+
+    // 관통: 고정 방향으로 직진(호밍·근접 소멸 없음). 명중 판정·소멸은 combat이 담당하고,
+    // 최대 비행 거리를 넘기면 스스로 소멸한다(적을 다 못 뚫어도 무한 비행 방지).
+    if (this.piercing) {
+      const step = this.speed * dt;
+      this.x += this.dirX * step;
+      this.y += this.dirY * step;
+      this.traveled += step;
+      if (this.traveled >= this.maxTravel) this.dead = true;
+      return;
+    }
 
     if (this.target && !this.target.dead && !this.target.reachedBase) {
       this.aimX = this.target.x;

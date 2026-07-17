@@ -10,6 +10,7 @@ import { Barracks } from '../entities/unit';
 import { Tower } from '../entities/tower';
 import type { TowerKind } from '../entities/tower';
 import type { SoldierPanelInfo, TowerPanelInfo } from '../ui/buildMenu';
+import type { Economy } from './economy';
 import economyData from '../data/economy.json';
 
 /** 종류에 맞는 타워 인스턴스 생성 — 배럭이면 병사를 운용하는 Barracks, 그 외엔 기본 Tower. */
@@ -57,18 +58,36 @@ export function sellRefund(t: Tower): number {
  */
 export function towerPanelInfo(t: Tower, gold: number): TowerPanelInfo {
   const cost = t.upgradeCost;
+  const chosen = t.specialSpec; // 이미 선택된 분기(없으면 null).
+  const canChoose = t.canChooseSpecial; // 최대 레벨 + 미선택 + 분기 보유.
   return {
     name: t.spec.name,
     level: t.level,
     maxLevel: t.maxLevel,
     damage: Math.round(t.effectiveDamage * 10) / 10, // 소수 1자리.
     range: Math.round(t.effectiveRange),
-    fireRate: t.spec.fireRate,
+    fireRate: Math.round(t.effectiveFireRate * 100) / 100, // rapid 반영 실효 공속.
     soldier: soldierPanelInfo(t), // 배럭이면 병사 스탯, 아니면 undefined(일반 타워 패널).
     upgradeCost: cost,
     canAffordUpgrade: cost !== null && gold >= cost,
     refund: sellRefund(t),
+    specials: canChoose ? t.specials.map((s) => ({ id: s.id, name: s.name, desc: s.desc })) : undefined,
+    specialCost: canChoose ? t.specialCost : undefined,
+    canAffordSpecial: canChoose && gold >= t.specialCost,
+    chosenSpecial: chosen ? { id: chosen.id, name: chosen.name, desc: chosen.desc } : null,
   };
+}
+
+/**
+ * 4레벨 스페셜 분기 선택(D4.2) — 골드 충분 + 선택 가능(최대 레벨·미선택)일 때만. 골드 차감 후
+ * 타워에 분기를 확정한다(invested += specialCost, 이후 다른 분기 불가). 패널 갱신은 호출부가 한다.
+ */
+export function chooseTowerSpecial(economy: Economy, selected: Tower | null, id: string): void {
+  if (!selected || !selected.canChooseSpecial) return;
+  const cost = selected.specialCost;
+  if (economy.gold < cost) return;
+  economy.spend(cost);
+  selected.chooseSpecial(id);
 }
 
 /**
