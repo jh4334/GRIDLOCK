@@ -27,6 +27,7 @@ const GHOST_BAD = 'rgba(230, 70, 70, 0.35)';
 
 export interface ConquestDeps {
   onExit: () => void; // 타이틀 복귀(App이 정복 모드를 정리하고 타이틀을 그린다).
+  audio: AudioEngine; // 두 모드가 공유하는 사운드 엔진(음량·음소거 단일 소스, D2.6).
 }
 
 export class ConquestGame {
@@ -34,7 +35,7 @@ export class ConquestGame {
   private readonly canvas: HTMLCanvasElement;
   private readonly input: MouseInput;
   private readonly keyboard = new Keyboard();
-  private readonly audio = new AudioEngine();
+  private readonly audio: AudioEngine; // App이 주입(공유 엔진). 생성자에서 deps로부터 대입.
   private readonly controls: Controls;
   private readonly menu: ConquestMenu;
   private readonly selection = new ConquestSelection();
@@ -55,12 +56,14 @@ export class ConquestGame {
   constructor(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D, deps: ConquestDeps) {
     this.canvas = canvas;
     this.ctx = ctx;
+    this.audio = deps.audio;
     this.input = new MouseInput(canvas);
 
     this.controls = new Controls({
       speeds: SPEEDS,
       rootId: 'conquest-controls',
       showNextWave: false,
+      audio: this.audio, // 음량/음소거 위젯을 정복 컨트롤 바에 부착(D2.6).
       onSetSpeed: (s) => this.setSpeed(s),
       onRestart: () => this.restart(),
       onToTitle: () => deps.onExit(),
@@ -89,6 +92,7 @@ export class ConquestGame {
       tryPlace: (x, y) => this.tryPlace(x, y),
       isAttackMove: () => this.attackMove,
       setAttackMove: (v) => (this.attackMove = v),
+      toggleMute: () => this.audio.toggleMute(), // M키 음소거(디펜스와 동일, 공유 엔진).
     });
     this.setUiVisible(false);
   }

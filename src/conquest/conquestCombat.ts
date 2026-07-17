@@ -14,14 +14,14 @@ import { drawProjectile } from '../render/fx';
 import type { ConquestGrid } from './conquestMap';
 import type { CombatUnit, Combatant, Pt } from './combatUnit';
 import type { Building } from './building';
-import type { HQ } from './hq';
+import type { HQ, Side } from './hq';
 
 const C = conquestData;
 const PROJ_LIFE_MISS = 0.4; // 대상 소멸 후 투사체가 직진하다 사라지는 최대 시간(초).
 
 // 전투가 이펙트·사운드를 직접 그리지 않도록 발생 시점만 훅으로 알린다(코디네이터가 배선).
 export interface CombatHooks {
-  onUnitKilled?(x: number, y: number, color: string): void;
+  onUnitKilled?(x: number, y: number, color: string, side: Side): void;
   onProjectileHit?(): void;
 }
 
@@ -95,7 +95,7 @@ export class ConquestCombat {
         const victim = target as CombatUnit;
         if (!victim.dead) {
           victim.dead = true;
-          this.cb.onUnitKilled?.(victim.x, victim.y, victim.color);
+          this.cb.onUnitKilled?.(victim.x, victim.y, victim.color, victim.side);
         }
       }
     }
@@ -197,7 +197,7 @@ export class ConquestCombat {
           const v = p.target as CombatUnit;
           if (!v.dead) {
             v.dead = true;
-            this.cb.onUnitKilled?.(v.x, v.y, v.color);
+            this.cb.onUnitKilled?.(v.x, v.y, v.color, v.side);
           }
         }
         this.cb.onProjectileHit?.();

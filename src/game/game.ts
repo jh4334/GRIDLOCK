@@ -37,6 +37,7 @@ const SPEEDS = [1, 2, 3];
 // App(모드 조율자)이 주입하는 콜백 — 타이틀 복귀 시 App이 디펜스 모드를 정리한다.
 export interface GameDeps {
   onExit: () => void; // '타이틀로' 클릭 시 App이 deactivate 후 타이틀을 그린다.
+  audio: AudioEngine; // 두 모드가 공유하는 사운드 엔진(음량·음소거 단일 소스, D2.6).
 }
 
 export class Game {
@@ -53,7 +54,7 @@ export class Game {
   private readonly combat: CombatSystem;
   private readonly melee: MeleeSystem;
   private readonly effects = new EffectsSystem();
-  private readonly audio = new AudioEngine();
+  private readonly audio: AudioEngine; // App이 주입(공유 엔진). 생성자에서 deps로부터 대입.
   private readonly shake = new ScreenShake();
   private readonly decals = new DecalField(); // 적 사망 잔해 데칼(D2.5) — 월드 시간 기반 페이드.
   private readonly vignette = new Vignette(); // 기지 피격 붉은 비네트(D2.5) — 실시간 페이드.
@@ -79,15 +80,16 @@ export class Game {
   ) {
     this.canvas = canvas;
     this.ctx = ctx;
+    this.audio = deps.audio;
     this.input = new MouseInput(canvas);
     this.flowField = computeFlowField(this.grid);
     this.roadCells = computeRoadCells(this.flowField);
     this.lastGold = this.economy.gold;
 
-    // 세 번째 인자 isActive: 정복 모드·타이틀에서 숫자키 스폰이 새지 않도록 격리.
+    // isActive 가드: 정복 모드·타이틀에서 숫자키 스폰이 새지 않도록 격리.
     this.spawner = new DebugSpawner(this.keyboard, (kind) => this.enemies.push(createEnemy(kind, this.flowField)), () => this.active);
 
-    // 전투(투사체)·근접(병사) 시스템 생성 + 이펙트/사운드/화면흔들림 배선은 battleSystems로 분리.
+    // 전투(투사체)·근접(병사) 시스템 + 이펙트/사운드/화면흔들림 배선은 battleSystems로 분리.
     const battle = createBattleSystems({ effects: this.effects, audio: this.audio, shake: this.shake, decals: this.decals });
     this.combat = battle.combat;
     this.melee = battle.melee;
@@ -95,8 +97,7 @@ export class Game {
     // 웨이브 스포너 — 스폰 시점의 flowField를 클로저로 주입(설치/판매로 바뀌어도 최신값 사용).
     this.waveManager = new WaveManager({
       spawn: (kind, hpMult) => this.enemies.push(createEnemy(kind, this.flowField, hpMult)),
-      // 웨이브 클리어·조기 호출(얼리콜) 보너스는 같은 피드백(골드+사운드)을 재사용한다.
-      onWaveClear: (_wave, bonus) => this.awardBonus(bonus),
+      onWaveClear: (_wave, bonus) => this.awardBonus(bonus), // 클리어·얼리콜은 동일 피드백(골드+사운드).
       onEarlyCall: (bonus) => this.awardBonus(bonus),
       onVictory: () => { this.flow.win(); this.audio.win(); },
       // 시작/완료/리셋 시점에만 다음 웨이브 구성을 프리뷰에 반영(매 프레임 아님).
@@ -105,6 +106,7 @@ export class Game {
 
     this.controls = new Controls({
       speeds: SPEEDS,
+      audio: this.audio, // 음량/음소거 위젯을 컨트롤 바에 부착(D2.6).
       onNextWave: () => this.startNextWave(),
       onSetSpeed: (s) => this.setSpeed(s),
       onRestart: () => this.flow.restart(),
@@ -112,9 +114,8 @@ export class Game {
     });
     this.controls.setActiveSpeed(this.speed);
 
-    // 세 번째 인자 isActive: 정복 모드·타이틀에서 G/N/H 치트가 새지 않도록 격리.
-    new DebugCheats(
-      this.keyboard,
+    // isActive 가드: 정복 모드·타이틀에서 G/N/H 치트가 새지 않도록 격리.
+    new DebugCheats(this.keyboard,
       { addGold: (n) => this.economy.addGold(n), skipWave: () => this.skipWave(), toggleHitboxes: () => (this.showHitbox = !this.showHitbox) },
       () => this.active,
     );
@@ -165,8 +166,7 @@ export class Game {
       },
     });
 
-    // 마우스·키보드 배선은 gameInput으로 분리(M11, game.ts 300줄 제한). 좌클릭 라우팅·드래그
-    // 선택·우클릭 명령·단축키를 한곳에서 등록한다.
+    // 마우스·키보드 배선은 gameInput으로 분리(M11) — 좌클릭 라우팅·드래그·명령·단축키를 한곳에 등록.
     bindGameInput({
       input: this.input,
       keyboard: this.keyboard,

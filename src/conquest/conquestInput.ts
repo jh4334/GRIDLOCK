@@ -23,6 +23,7 @@ export interface ConquestInputDeps {
   tryPlace: (x: number, y: number) => void;
   isAttackMove: () => boolean;
   setAttackMove: (v: boolean) => void;
+  toggleMute: () => void; // M키 음소거 토글(active 시에만).
 }
 
 /** ConquestGame 생성자에서 1회 호출 — 모든 마우스·키보드 핸들러를 등록한다. */
@@ -80,6 +81,11 @@ export function bindConquestInput(d: ConquestInputDeps): void {
     if (d.isAttackMove()) d.setAttackMove(false);
     else if (d.getPlaceKind()) d.cancelPlace();
     else selection.clear();
+  });
+
+  // M — 음소거 토글(디펜스와 동기화, 공유 엔진).
+  keyboard.on('m', () => {
+    if (d.isActive()) d.toggleMute();
   });
 
   // 1~9 — Ctrl과 함께면 현재 선택을 부대로 지정, 아니면 해당 부대 선택.

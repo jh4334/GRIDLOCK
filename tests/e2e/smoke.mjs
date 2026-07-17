@@ -42,6 +42,7 @@ async function main() {
     await defenseStage(page);
     await conquestStage(page);
     await conquestDefeatStage(page);
+    await audioStage(page);
     // 어느 단계에서든 런타임 예외가 났으면 실패로 본다(콘솔 pageerror 수집).
     stage = 'page-errors';
     check(errors.length === 0, `페이지 런타임 오류 ${errors.length}건: ${errors.join(' | ')}`);
@@ -253,6 +254,41 @@ async function conquestDefeatStage(page) {
   const defeated = await waitUntil(page, async () => await restartBtn.isVisible().catch(() => false), 90000);
   check(defeated, '방치 90초 내 본진이 함락되지 않음(패배 오버레이 미도달)');
   await page.screenshot({ path: join(OUT, '06-conquest-defeat.png') });
+}
+
+// ── 6) 사운드 옵션(D2.6): 음량 슬라이더 저장·복원 ─────────────────
+// 오디오 재생은 헤드리스로 검증 불가하므로, 옵션 지속성만 DOM으로 확인한다:
+// 디펜스 컨트롤 바의 음량 슬라이더를 임의값으로 바꾸고 새로고침 → 재진입 시 그 값이 유지되면
+// localStorage 저장·복원(gridlock.audio)이 동작하는 것이다.
+async function audioStage(page) {
+  stage = 'audio-enter';
+  await page.goto(BASE_URL);
+  await page.waitForTimeout(1100);
+  const { pt } = await canvasMapper(page);
+  await page.mouse.click(...pt(340, 403)); // 디펜스 진입(컨트롤 바 노출).
+  await page.waitForTimeout(400);
+
+  const slider = () => vis(page, '#controls .volume-slider');
+  check(await slider().isVisible(), '디펜스 컨트롤 바에 음량 슬라이더가 없음');
+
+  // 슬라이더를 37로 설정하고 input 이벤트를 발생시킨다(저장 트리거).
+  stage = 'audio-set';
+  await slider().evaluate((el) => {
+    el.value = '37';
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await page.waitForTimeout(200);
+  check((await slider().inputValue()) === '37', '슬라이더 값이 37로 설정되지 않음');
+
+  // 새로고침 후 재진입 → 저장값(37)이 복원되어야 한다.
+  stage = 'audio-reload';
+  await page.reload();
+  await page.waitForTimeout(1100);
+  await page.mouse.click(...pt(340, 403));
+  await page.waitForTimeout(400);
+  const restored = await slider().inputValue();
+  check(restored === '37', `리로드 후 음량이 복원되지 않음(기대 37, 실제 ${restored})`);
+  await page.screenshot({ path: join(OUT, '07-audio-persist.png') });
 }
 
 main().catch((err) => {

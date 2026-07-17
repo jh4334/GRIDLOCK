@@ -21,10 +21,13 @@ const C = conquestData;
 
 export type ConquestPhase = 'playing' | 'won' | 'lost';
 
-// 승/패 효과음 배선용 최소 계약(코디네이터의 AudioEngine이 구조적으로 만족).
+// 효과음 배선용 최소 계약(코디네이터의 AudioEngine이 구조적으로 만족).
 export interface WorldAudio {
   kill(): void;
   hit(): void;
+  unitDown(): void; // 아군 유닛 사망.
+  buildDone(): void; // 플레이어 건설 완료.
+  alarm(): void; // 적 공격 웨이브 출발 경보.
 }
 
 export class ConquestWorld {
@@ -56,9 +59,10 @@ export class ConquestWorld {
     }
 
     this.combat = new ConquestCombat({
-      onUnitKilled: (x, y, color) => {
+      onUnitKilled: (x, y, color, side) => {
         this.effects.spawnKill(x, y, color);
-        this.audio?.kill();
+        if (side === 'player') this.audio?.unitDown(); // 아군 사망은 낮은 피치로 구분.
+        else this.audio?.kill();
       },
       onProjectileHit: () => this.audio?.hit(),
     });
@@ -71,6 +75,7 @@ export class ConquestWorld {
       buildings: this.buildings,
       units: this.units,
       onBuildComplete: (b) => this.onBuildComplete(b),
+      onWaveLaunch: () => this.audio?.alarm(), // 적 웨이브 출발 시 경보음.
     });
   }
 
@@ -172,6 +177,7 @@ export class ConquestWorld {
   private onBuildComplete(b: Building): void {
     if (b.isBarracks) spawnUnitsFor(b, this.units, this.grid);
     else if (b.kind === 'depot' && b.side === 'player') this.depotsBuilt++;
+    if (b.side === 'player') this.audio?.buildDone(); // 플레이어 건설 완료음.
   }
 
   private workerContext(): WorkerContext {

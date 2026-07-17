@@ -63,3 +63,43 @@ export function updateBest(candidate: BestRecord): BestRecord {
   }
   return prev as BestRecord; // isBetter가 false면 prev는 non-null.
 }
+
+// ── 사운드 옵션(D2.6) ─────────────────────────────────────────────
+// 음량(0~1)·음소거를 gridlock.audio에 저장·복원한다(loadBest와 동일한 try/catch 패턴).
+
+export interface AudioSettings {
+  volume: number; // 0~1 마스터 음량 배율.
+  muted: boolean;
+}
+
+const AUDIO_KEY = 'gridlock.audio';
+
+/** 저장된 사운드 옵션을 읽는다. 없거나 손상/예외면 null. */
+export function loadAudio(): AudioSettings | null {
+  try {
+    const raw = localStorage.getItem(AUDIO_KEY);
+    if (!raw) return null;
+    const parsed: unknown = JSON.parse(raw);
+    if (
+      typeof parsed === 'object' &&
+      parsed !== null &&
+      typeof (parsed as AudioSettings).volume === 'number' &&
+      typeof (parsed as AudioSettings).muted === 'boolean'
+    ) {
+      const s = parsed as AudioSettings;
+      return { volume: Math.min(1, Math.max(0, s.volume)), muted: s.muted };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/** 사운드 옵션 저장. 예외(프라이빗 모드 등)는 조용히 무시. */
+export function saveAudio(settings: AudioSettings): void {
+  try {
+    localStorage.setItem(AUDIO_KEY, JSON.stringify(settings));
+  } catch {
+    // 저장 실패는 게임 진행에 영향 없음 — 무시.
+  }
+}

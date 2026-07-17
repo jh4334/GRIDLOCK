@@ -30,6 +30,7 @@ export interface EnemyDeps {
   buildings: Building[]; // 공유 — 적 건물을 push한다.
   units: CombatUnit[]; // 공유 — 웨이브 때 적 유닛 부분집합을 명령한다.
   onBuildComplete(b: Building): void; // 배럭 완성 시 유닛 배치 등(월드 공유 로직).
+  onWaveLaunch?(): void; // 공격 웨이브 출발 시(≥1기 출발) — 경보음 배선용.
 }
 
 export class EnemyAI {
@@ -160,16 +161,19 @@ export class EnemyAI {
   // 대기 아닌(리스폰 대기 제외 = units에 존재하는) 적 유닛 전원을 플레이어 HQ로 공격 이동.
   private launchWave(): void {
     const hq = this.deps.playerHQ;
+    let launched = 0;
     for (const u of this.deps.units) {
       if (u.side !== 'enemy' || u.dead) continue;
       const path = pathToStructure(this.deps.grid, u.cell, hq.cx, hq.cy);
       if (path) {
         u.path = path;
         u.orderedTarget = hq;
+        launched++;
       }
     }
     this.waveActive = true;
     this.recallTimer = C.enemy.waveDuration;
+    if (launched > 0) this.deps.onWaveLaunch?.(); // 실제 병력이 출발할 때만 경보.
   }
 
   // 웨이브 종료 — 생존 유닛은 명령을 놓고 집결지 방어로 복귀한다.

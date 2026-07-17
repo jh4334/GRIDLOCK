@@ -3,7 +3,9 @@
 // 클릭을 콜백으로 알리고 표시(활성/하이라이트/노출)만 갱신한다.
 
 import { WavePreview } from './wavePreview';
+import { AudioControls } from './audioControls';
 import type { WaveComposition } from '../game/waves';
+import type { AudioEngine } from '../core/audio';
 
 export interface ControlsConfig {
   speeds: number[]; // 예: [1, 2, 3]
@@ -13,6 +15,7 @@ export interface ControlsConfig {
   onRestart?: () => void; // 디펜스 전용.
   rootId?: string; // 컨트롤 바 컨테이너 id(기본 'controls'). 정복은 별도 컨테이너 사용.
   showNextWave?: boolean; // 다음 웨이브 버튼 생성 여부(기본 true).
+  audio?: AudioEngine; // 있으면 바 우측에 음량 슬라이더 + 음소거 토글을 부착(D2.6).
 }
 
 export class Controls {
@@ -67,6 +70,9 @@ export class Controls {
     this.toTitleBtn.addEventListener('click', () => config.onToTitle());
     this.toTitleBtn.style.display = 'none';
     root.appendChild(this.toTitleBtn);
+
+    // 음량/음소거 위젯(D2.6) — 엔진 상태를 스스로 반영·조작한다(엔진 subscribe로 동기화).
+    if (config.audio) new AudioControls(root, config.audio);
   }
 
   /** 다음 웨이브 버튼 활성/비활성(대기 중에만 활성). 정복 모드엔 버튼이 없어 무시. */

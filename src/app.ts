@@ -7,6 +7,8 @@
 
 import { GameLoop } from './core/loop';
 import { MouseInput } from './core/input';
+import { AudioEngine } from './core/audio';
+import { loadAudio, saveAudio } from './core/storage';
 import { Game } from './game/game';
 import { ConquestGame } from './conquest/conquestGame';
 import { renderTitle, hitTitleButton } from './ui/title';
@@ -17,6 +19,7 @@ type Mode = 'title' | 'defense' | 'conquest';
 export class App {
   private readonly ctx: CanvasRenderingContext2D;
   private readonly titleInput: MouseInput;
+  private readonly audio: AudioEngine;
   private readonly game: Game;
   private readonly conquest: ConquestGame;
   private mode: Mode = 'title';
@@ -24,8 +27,13 @@ export class App {
   constructor(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D) {
     this.ctx = ctx;
 
-    this.game = new Game(canvas, ctx, { onExit: () => this.toTitle('defense') });
-    this.conquest = new ConquestGame(canvas, ctx, { onExit: () => this.toTitle('conquest') });
+    // 두 모드가 하나의 사운드 엔진을 공유한다 — 음량·음소거가 모드 간 어긋나지 않게.
+    // 저장값을 복원해 초기화하고, 이후 변경(슬라이더·버튼·M키)은 localStorage에 즉시 저장한다.
+    this.audio = new AudioEngine(loadAudio() ?? undefined);
+    this.audio.subscribe(() => saveAudio({ volume: this.audio.volume, muted: this.audio.isMuted }));
+
+    this.game = new Game(canvas, ctx, { onExit: () => this.toTitle('defense'), audio: this.audio });
+    this.conquest = new ConquestGame(canvas, ctx, { onExit: () => this.toTitle('conquest'), audio: this.audio });
 
     // 타이틀 입력은 각 모드 입력보다 뒤에 등록한다 — 모드 진입 클릭이 방금 활성화된 모드에서
     // 다시 처리되지 않도록(모드 입력은 아직 비활성일 때 먼저 지나가고, 그다음 여기서 활성화).
