@@ -2,6 +2,8 @@
 
 미로형 타워 디펜스. 빈 평지에 타워를 벽처럼 세워 스폰 지점에서 기지까지 이어지는 적의 경로를 비틀고 늘려, 20웨이브를 버텨내면 승리한다. 적은 뚫린 칸으로만 이동(플로우필드)하며, 길을 완전히 막는 배치는 자동으로 거부된다. 처치 보상으로 타워를 증설·업그레이드하며 미로를 강화하는 것이 코어 루프다. Vanilla TypeScript + Canvas 2D로 게임 프레임워크 없이 구현했다(설계 근거: [DESIGN.md](DESIGN.md)).
 
+그래픽: Kenney.nl (CC0) — `public/assets/kenney/`(라이선스: [LICENSE.txt](public/assets/kenney/LICENSE.txt)). 스킨 로드 전에는 내장 벡터 아트로 폴백한다.
+
 ## 실행 / 빌드
 
 ```bash

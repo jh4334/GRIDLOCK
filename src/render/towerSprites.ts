@@ -3,7 +3,7 @@
 //
 // 포탑은 오른쪽(+x, angle 0)을 향하도록 그려 두고, 렌더 시 tower.aimAngle 로 회전한다.
 // 레벨 마커·선택 링·사거리 원은 가벼운 벡터 오버레이(타워 수가 적어 저렴).
-// 이미지 교체: 'tower/<kind>/base', 'tower/<kind>/turret' key로 setSprite 하면 스왑된다.
+// 이미지 교체: 'tower/<kind>/base', 'tower/<kind>/turret<1|2|3>' key로 setSprite 하면 스왑된다.
 
 import { TILE } from '../game/grid';
 import { createSpriteCanvas, defineSprite, getSprite, drawSprite } from './sprites';
@@ -24,9 +24,13 @@ const S = TILE; // 스프라이트 한 변.
 const LEVEL_MARK = GOLD;
 
 // ── 프리렌더 등록 ────────────────────────────────────────────────
+// 포탑은 레벨 1/2/3 각각 별도 key(turret1/2/3)로 둔다 — 벡터 폴백은 세 레벨 동일하지만,
+// 실제 스킨(assetLoader)은 barrel1/2/3 포신으로 교체해 업그레이드 시 포신이 바뀐다.
 for (const kind of Object.keys(TINT) as TowerVisualKind[]) {
   defineSprite(`tower/${kind}/base`, () => buildBase(TINT[kind], kind === 'barracks'));
-  if (kind !== 'barracks') defineSprite(`tower/${kind}/turret`, () => buildTurret(kind));
+  if (kind !== 'barracks') {
+    for (let lvl = 1; lvl <= 3; lvl++) defineSprite(`tower/${kind}/turret${lvl}`, () => buildTurret(kind));
+  }
 }
 defineSprite('tower/barracks/deco', () => buildBunkerDeco());
 
@@ -157,7 +161,8 @@ export function drawTower(
   if (kind === 'barracks') {
     ctx.drawImage(getSprite('tower/barracks/deco'), x - S / 2, y - S / 2);
   } else {
-    drawSprite(ctx, `tower/${kind}/turret`, x, y, aimAngle);
+    const lvl = Math.max(1, Math.min(3, level)); // 레벨별 포신(barrel1/2/3) 선택.
+    drawSprite(ctx, `tower/${kind}/turret${lvl}`, x, y, aimAngle);
   }
   drawLevelMarkers(ctx, x, y, level);
 }

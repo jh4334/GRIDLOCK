@@ -1,46 +1,41 @@
-// 바닥·맵 스프라이트 — 회로기판 타일(정적 프리렌더), 스폰 포털 게이트, 코어 리액터.
+// 바닥·맵 스프라이트 — 초원/사막 지형 타일(정적 프리렌더), 스폰 포털 게이트, 코어 리액터.
 //
-// 회로 타일은 좌표 해시로 변주해 결정적으로 그린다(Math.random 금지). 바닥 전체는 Grid가
-// 정적 레이어에 1회 스탬프한다(paintCircuitFloor). 포털/리액터/크리스탈 발광은 시간에
-// 따라 맥동하므로 매 프레임 drawImage + 회전/알파로 그린다(스프라이트 자체는 프리렌더).
+// 지형 타일은 좌표 해시로 tile1/2를 변주해 결정적으로 그린다(Math.random 금지). 바닥 전체는
+// Grid가 정적 레이어에 1회 스탬프한다(paintGroundFloor). 포털/리액터/크리스탈은 벡터 폴백일
+// 때 시간 맥동 연출을 하고, 실제 스킨 로드 후엔 합성 스프라이트를 그대로 찍는다(assetsReady 분기).
 
 import { TILE } from '../game/grid';
-import { createSpriteCanvas, defineSprite, getSprite, animTime, hash01 } from './sprites';
+import { createSpriteCanvas, defineSprite, getSprite, animTime, hash01, assetsReady } from './sprites';
 import * as P from './palette';
 import { withAlpha } from './palette';
 
-// ── 회로 바닥(정적 레이어에 직접 스탬프) ────────────────────────
-/**
- * 바닥 전체를 회로기판 패턴으로 칠한다(칸마다 좌표 해시로 트레이스/노드 변주). 격자선은 옅게.
- * Grid.buildStaticLayer가 1회 호출 — 이후 매 프레임 통째로 drawImage된다(재계산 없음).
- */
-export function paintCircuitFloor(ctx: CanvasRenderingContext2D, cols: number, rows: number, base: string): void {
-  ctx.fillStyle = base;
+// ── 지형 바닥(정적 레이어에 직접 스탬프) ────────────────────────
+// 초원(디펜스)/사막(정복) 전장. 실제 Kenney 타일 스킨이 로드되면 칸마다 좌표 해시로 tile1/2를
+// 변주해 찍고, 로드 전엔 베이스색만 채워 즉시 실행 가능하게 한다(폴백). 격자선은 아주 옅게.
+export type GroundVariant = 'grass' | 'sand';
+
+// 스킨 로드 전 폴백 베이스색(초원 올리브그린 / 사막 탄색).
+const GROUND_BASE: Record<GroundVariant, string> = { grass: '#4a7a3a', sand: '#c2a86a' };
+// 지형 위 아주 옅은 격자선(진영 구분 안 해치도록 은은하게).
+const GROUND_GRID = 'rgba(0, 0, 0, 0.10)';
+
+/** 바닥 전체를 초원/사막 타일로 칠한다. Grid.buildStaticLayer가 1회 호출(에셋 준비 시 재빌드). */
+export function paintGroundFloor(ctx: CanvasRenderingContext2D, cols: number, rows: number, variant: GroundVariant): void {
+  ctx.fillStyle = GROUND_BASE[variant];
   ctx.fillRect(0, 0, cols * TILE, rows * TILE);
 
-  // 옅은 방사형 명암(중앙이 살짝 밝게) — 딥 네이비 그라디언트.
-  const g = ctx.createRadialGradient(
-    (cols * TILE) / 2,
-    (rows * TILE) / 2,
-    TILE,
-    (cols * TILE) / 2,
-    (rows * TILE) / 2,
-    cols * TILE * 0.6,
-  );
-  g.addColorStop(0, withAlpha('#1c2740', 0.35));
-  g.addColorStop(1, withAlpha('#0a0e16', 0.35));
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, cols * TILE, rows * TILE);
-
-  // 칸별 회로 디테일.
-  for (let cy = 0; cy < rows; cy++) {
-    for (let cx = 0; cx < cols; cx++) {
-      paintCircuitCell(ctx, cx, cy);
+  // 실제 타일 스킨이 준비됐을 때만 칸별로 찍는다(로드 전엔 베이스색 폴백).
+  if (assetsReady()) {
+    for (let cy = 0; cy < rows; cy++) {
+      for (let cx = 0; cx < cols; cx++) {
+        const n = hash01(cx, cy, 5) < 0.5 ? 1 : 2; // 좌표 해시로 tile1/tile2 변주(결정적).
+        ctx.drawImage(getSprite(`tile/floor/${variant}${n}`), cx * TILE, cy * TILE, TILE, TILE);
+      }
     }
   }
 
-  // 아주 옅은 격자선.
-  ctx.strokeStyle = P.GRID_LINE;
+  // 아주 옅은 격자선(설치 칸 감을 남기되 회로 패턴은 제거).
+  ctx.strokeStyle = GROUND_GRID;
   ctx.lineWidth = 1;
   ctx.beginPath();
   for (let cx = 0; cx <= cols; cx++) {
@@ -54,42 +49,6 @@ export function paintCircuitFloor(ctx: CanvasRenderingContext2D, cols: number, r
     ctx.lineTo(cols * TILE, y);
   }
   ctx.stroke();
-}
-
-// 한 칸의 회로 트레이스 라인 + 노드 도트를 좌표 해시로 변주해 그린다.
-function paintCircuitCell(ctx: CanvasRenderingContext2D, cx: number, cy: number): void {
-  const ox = cx * TILE;
-  const oy = cy * TILE;
-  const r = hash01(cx, cy, 1);
-  // 절반 정도의 칸에만 트레이스를 넣어 과하지 않게.
-  if (r < 0.5) {
-    ctx.strokeStyle = P.TRACE_LINE;
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    const mid = TILE / 2;
-    if (r < 0.17) {
-      // ㄱ자 꺾인 트레이스.
-      ctx.moveTo(ox + mid, oy + 6);
-      ctx.lineTo(ox + mid, oy + mid);
-      ctx.lineTo(ox + TILE - 6, oy + mid);
-    } else if (r < 0.34) {
-      ctx.moveTo(ox + 6, oy + mid);
-      ctx.lineTo(ox + TILE - 6, oy + mid);
-    } else {
-      ctx.moveTo(ox + mid, oy + 6);
-      ctx.lineTo(ox + mid, oy + TILE - 6);
-    }
-    ctx.stroke();
-  }
-  // 노드 도트(트레이스 교차점 느낌).
-  if (hash01(cx, cy, 2) < 0.28) {
-    const dx = ox + TILE / 2 + (hash01(cx, cy, 3) - 0.5) * 14;
-    const dy = oy + TILE / 2 + (hash01(cx, cy, 4) - 0.5) * 14;
-    ctx.fillStyle = P.TRACE_NODE;
-    ctx.beginPath();
-    ctx.arc(dx, dy, 1.6, 0, Math.PI * 2);
-    ctx.fill();
-  }
 }
 
 // ── 스폰 포털 게이트(마젠타, 회전/펄스) ─────────────────────────
@@ -140,6 +99,11 @@ function buildPortalRing(color: string): HTMLCanvasElement {
 
 /** 스폰 포털 그리기 — 중심 발광 + 반대로 도는 두 링 + 맥동(시간 기반). 칸 중심 (x,y). */
 export function drawPortal(ctx: CanvasRenderingContext2D, x: number, y: number): void {
+  // 스킨 로드 후: 궤적+레드 깃발 합성 스프라이트를 그대로 찍는다(가산 발광/회전 링 제거).
+  if (assetsReady()) {
+    ctx.drawImage(getSprite(PORTAL), x - TILE / 2, y - TILE / 2);
+    return;
+  }
   const t = animTime();
   const pulse = 0.85 + Math.sin(t * 3) * 0.15;
   ctx.save();
@@ -206,6 +170,15 @@ function buildReactorRing(color: string): HTMLCanvasElement {
 /** 코어 리액터 그리기 — 베이스 + 맥동 코어 + 회전 링. colorKey: 'cyan'|'red'. */
 export function drawReactor(ctx: CanvasRenderingContext2D, x: number, y: number, colorKey: string): void {
   const t = animTime();
+  // 스킨 로드 후: 깃발+전차 본진 합성 스프라이트 + 은은한 알파 맥동(가산 발광/회전 링 제거).
+  if (assetsReady()) {
+    ctx.drawImage(getSprite(reactorKey(colorKey)), x - TILE / 2, y - TILE / 2);
+    ctx.save();
+    ctx.globalAlpha = 0.12 + Math.sin(t * 3) * 0.08; // 살아있는 본진 느낌의 옅은 맥동.
+    ctx.drawImage(getSprite(reactorKey(colorKey)), x - TILE / 2, y - TILE / 2);
+    ctx.restore();
+    return;
+  }
   ctx.drawImage(getSprite(reactorKey(colorKey)), x - TILE / 2, y - TILE / 2);
   // 맥동 발광 오버레이.
   ctx.save();

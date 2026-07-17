@@ -74,6 +74,31 @@ export function drawSprite(
   ctx.restore();
 }
 
+// ── 에셋 로드 준비 신호 ──────────────────────────────────────────
+// 실제 PNG 스킨(assetLoader)이 setSprite를 모두 마치면 markAssetsReady()가 호출된다.
+// 바닥 타일처럼 정적 레이어를 프리렌더해 둔 쪽은 onAssetsReady로 재빌드하고,
+// 포털·리액터 렌더는 assetsReady()로 벡터 폴백 대신 스프라이트 경로를 고른다.
+let assetsLoaded = false;
+const readyCbs: Array<() => void> = [];
+
+/** 실제 에셋 스킨 로드가 끝났는가(스프라이트 교체 완료). 렌더가 폴백/스킨을 분기하는 데 쓴다. */
+export function assetsReady(): boolean {
+  return assetsLoaded;
+}
+
+/** 에셋 준비 시 1회 실행할 콜백 등록. 이미 준비됐으면 즉시 실행(정적 레이어 재빌드용). */
+export function onAssetsReady(cb: () => void): void {
+  if (assetsLoaded) cb();
+  else readyCbs.push(cb);
+}
+
+/** assetLoader가 모든 setSprite 후 호출 — 준비 플래그를 켜고 대기 콜백을 일괄 실행. */
+export function markAssetsReady(): void {
+  assetsLoaded = true;
+  for (const cb of readyCbs) cb();
+  readyCbs.length = 0;
+}
+
 // ── 애니메이션 클록 ──────────────────────────────────────────────
 // 포털 회전·리액터 펄스 등 시간 기반 연출용 공용 시계. update 단계에서 tickClock(dt)로
 // 진행시키고(App.update), render에서 animTime()으로 읽기만 한다(update/render 분리 준수).

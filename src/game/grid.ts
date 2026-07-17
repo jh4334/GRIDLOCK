@@ -8,8 +8,9 @@ export const COLS = 20;
 export const ROWS = 14;
 export const TILE = 48;
 
-// 회로 바닥·스폰 포털·기지 리액터 스프라이트(NEON GRID 아트 패스).
-import { paintCircuitFloor, drawPortal, drawReactor } from '../render/tileSprites';
+// 지형 바닥·스폰 포털·기지 리액터 스프라이트(STEEL GRID 아트 패스).
+import { paintGroundFloor, drawPortal, drawReactor } from '../render/tileSprites';
+import { onAssetsReady } from '../render/sprites';
 
 // 스폰: 좌측 중앙 / 기지: 우측 중앙.
 export const SPAWN = { cx: 0, cy: 7 } as const;
@@ -17,9 +18,6 @@ export const BASE = { cx: COLS - 1, cy: 7 } as const;
 
 // 칸 상태 — M1에서는 빈 칸/타워 두 종류. 스폰·기지는 별도 특수 칸으로 표시한다.
 export type CellState = 'empty' | 'tower';
-
-// NEON GRID 바닥 베이스색(밸런스 아닌 시각 상수). 회로 패턴·격자선은 tileSprites가 그린다.
-const COLOR_FLOOR = '#12172a';
 
 // ── 좌표 변환 유틸 ─────────────────────────────────────────────
 // 인자 px, py 는 이미 캔버스 픽셀 좌표계로 보정된 값이어야 한다 (core/input.ts 참고).
@@ -52,6 +50,10 @@ export class Grid {
   constructor() {
     this.cells = new Array(COLS * ROWS).fill('empty');
     this.staticLayer = this.buildStaticLayer();
+    // 에셋 스킨 로드가 끝나면 초원 타일로 정적 바닥을 재빌드(로드 전엔 베이스색 폴백).
+    onAssetsReady(() => {
+      this.staticLayer = this.buildStaticLayer();
+    });
   }
 
   private index(cx: number, cy: number): number {
@@ -98,8 +100,8 @@ export class Grid {
     const c = layer.getContext('2d');
     if (!c) throw new Error('오프스크린 Canvas 2D context를 얻을 수 없습니다.');
 
-    // 회로기판 바닥 + 옅은 격자선(1회 프리렌더). 스폰/기지는 애니메이션이라 render에서 동적으로.
-    paintCircuitFloor(c, COLS, ROWS, COLOR_FLOOR);
+    // 초원 지형 바닥 + 옅은 격자선(1회 프리렌더). 스폰/기지는 애니메이션이라 render에서 동적으로.
+    paintGroundFloor(c, COLS, ROWS, 'grass');
     return layer;
   }
 

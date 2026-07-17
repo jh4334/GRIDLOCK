@@ -38,8 +38,40 @@ export function drawGlowDot(ctx: CanvasRenderingContext2D, x: number, y: number,
   ctx.restore();
 }
 
+// 투사체 스킨 key(색상별) — assetLoader가 setSprite로 등록하면 하기 경로가 활성화된다.
+function projSpriteKey(color: string): string {
+  return `fx/proj/${color}`;
+}
+
 /** 투사체 — 이전 위치(px,py)에서 현재까지 페이드 꼬리 + 발광 코어. */
 export function drawProjectile(ctx: CanvasRenderingContext2D, x: number, y: number, px: number, py: number, radius: number, color: string): void {
+  // 스킨 로드 후: 색상별 실탄 스프라이트를 비행 방향(px→현재)으로 회전해 그린다(레이저/포탄/결정).
+  const key = projSpriteKey(color);
+  if (hasSprite(key)) {
+    const dx = x - px;
+    const dy = y - py;
+    const angle = dx !== 0 || dy !== 0 ? Math.atan2(dy, dx) : 0; // 진행 방향각(동쪽 0).
+    // 옅은 가산 트레일(잔광).
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.strokeStyle = color;
+    ctx.lineCap = 'round';
+    ctx.lineWidth = radius * 0.8;
+    ctx.globalAlpha = 0.3;
+    ctx.beginPath();
+    ctx.moveTo(px, py);
+    ctx.lineTo(x, y);
+    ctx.stroke();
+    ctx.restore();
+    // 실탄 스프라이트(중심 회전 — 스프라이트는 동쪽 지향으로 프리렌더됨).
+    const s = getSprite(key) as HTMLCanvasElement;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(angle);
+    ctx.drawImage(s, -s.width / 2, -s.height / 2);
+    ctx.restore();
+    return;
+  }
   // 트레일(가산 발광, 뒤로 갈수록 투명).
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';

@@ -6,12 +6,11 @@
 // 정적 레이어(바닥+격자)만 프리렌더하고, 크리스탈·본진·건물은 동적 엔티티가 직접 그린다.
 
 import { COLS, ROWS, TILE, cellToPixel } from '../game/grid';
-import { paintCircuitFloor } from '../render/tileSprites';
+import { paintGroundFloor } from '../render/tileSprites';
+import { onAssetsReady } from '../render/sprites';
 import type { PathGrid } from '../systems/astar';
 
 export type ConquestCell = 'empty' | 'crystal' | 'wall';
-
-const COLOR_FLOOR = '#141a2e'; // 정복 바닥(디펜스보다 살짝 푸른 톤).
 
 export class ConquestGrid implements PathGrid {
   readonly cols = COLS;
@@ -23,6 +22,10 @@ export class ConquestGrid implements PathGrid {
   constructor() {
     this.cells = new Array(COLS * ROWS).fill('empty');
     this.staticLayer = this.buildStaticLayer();
+    // 에셋 스킨 로드가 끝나면 사막 타일로 정적 바닥을 재빌드(로드 전엔 베이스색 폴백).
+    onAssetsReady(() => {
+      this.staticLayer = this.buildStaticLayer();
+    });
   }
 
   private index(cx: number, cy: number): number {
@@ -60,7 +63,7 @@ export class ConquestGrid implements PathGrid {
     const c = layer.getContext('2d');
     if (!c) throw new Error('오프스크린 Canvas 2D context를 얻을 수 없습니다.');
 
-    paintCircuitFloor(c, COLS, ROWS, COLOR_FLOOR);
+    paintGroundFloor(c, COLS, ROWS, 'sand');
     return layer;
   }
 

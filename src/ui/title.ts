@@ -5,9 +5,9 @@
 import type { BestRecord } from '../core/storage';
 import { animTime } from '../render/sprites';
 
-const COLOR_LOGO = '#8fe0ff';
-const COLOR_SUB = '#8aa0c0';
-const COLOR_BEST = '#4dffd5';
+const COLOR_LOGO = '#e6d38f'; // STEEL GRID — 초원 전장 톤(앰버/올리브).
+const COLOR_SUB = '#a8b48a';
+const COLOR_BEST = '#e0b357';
 
 export type TitleMode = 'defense' | 'conquest';
 
@@ -65,7 +65,7 @@ export function renderTitle(ctx: CanvasRenderingContext2D, best: BestRecord | nu
   const glow = 18 + Math.sin(animTime() * 2) * 6;
   ctx.save();
   ctx.font = 'bold 84px system-ui, sans-serif';
-  ctx.shadowColor = '#39d5ff';
+  ctx.shadowColor = '#c9b05c';
   ctx.shadowBlur = glow;
   ctx.fillStyle = COLOR_LOGO;
   ctx.fillText('GRIDLOCK', w / 2, h * 0.22);
