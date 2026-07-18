@@ -14,9 +14,15 @@ import { drawWater, drawRough } from '../render/terrainTiles';
 import { onAssetsReady } from '../render/sprites';
 import type { MapTerrain, TerrainCell } from './maps';
 
-// 스폰: 좌측 중앙 / 기지: 우측 중앙.
-export const SPAWN = { cx: 0, cy: 7 } as const;
+// 칸 인덱스(스폰·기지·경로 계산 공용 좌표 타입, D7.3).
+export interface Cell {
+  cx: number;
+  cy: number;
+}
+
+// 기지: 우측 중앙(단일 유지). 스폰은 맵별로 복수 지원(D7.3) — 기본은 좌측 중앙 단일.
 export const BASE = { cx: COLS - 1, cy: 7 } as const;
+export const DEFAULT_SPAWNS: readonly Cell[] = [{ cx: 0, cy: 7 }];
 
 // 칸 상태 — 빈 칸/타워/지형 3종(D7.1). 스폰·기지는 별도 특수 칸으로 표시한다.
 //   'rock'(D4.4)  — 통행×·건설× (장애물).
@@ -54,6 +60,8 @@ export class Grid {
   private staticLayer: HTMLCanvasElement;
   // 현재 맵의 지형(정적). resetCells가 재주입하고 buildStaticLayer가 그린다(D4.4→D7.1).
   private terrain: MapTerrain = { rock: [], water: [], rough: [] };
+  // 현재 맵의 침입 지점(복수, D7.3). setMap이 주입하고, isSpawn·render·스포너·봉쇄 검사가 읽는다.
+  spawns: Cell[] = DEFAULT_SPAWNS.map((s) => ({ ...s }));
 
   constructor() {
     this.cells = new Array(COLS * ROWS).fill('empty');
@@ -124,18 +132,21 @@ export class Grid {
    * 디펜스 진입 시 App→Game이 호출. 칸을 지형 상태로 세우고 정적 레이어를 재빌드(지형
    * 스프라이트를 바닥 위에 굽는다). 재시작은 resetCells가 같은 지형을 되살려 맵을 유지한다.
    */
-  setMap(terrain: MapTerrain): void {
+  setMap(terrain: MapTerrain, spawns: readonly Cell[] = DEFAULT_SPAWNS): void {
     this.terrain = {
       rock: terrain.rock.map(([cx, cy]) => [cx, cy] as TerrainCell),
       water: terrain.water.map(([cx, cy]) => [cx, cy] as TerrainCell),
       rough: terrain.rough.map(([cx, cy]) => [cx, cy] as TerrainCell),
     };
+    // 스폰 목록 복사(외부 배열 공유 방지). 비어 있으면 기본 단일 스폰으로 폴백.
+    const list = spawns.length > 0 ? spawns : DEFAULT_SPAWNS;
+    this.spawns = list.map((s) => ({ cx: s.cx, cy: s.cy }));
     this.resetCells();
     this.staticLayer = this.buildStaticLayer();
   }
 
   isSpawn(cx: number, cy: number): boolean {
-    return cx === SPAWN.cx && cy === SPAWN.cy;
+    return this.spawns.some((s) => s.cx === cx && s.cy === cy);
   }
 
   isBase(cx: number, cy: number): boolean {
@@ -169,8 +180,10 @@ export class Grid {
   /** 정적 바닥 + 동적 스폰 포털/기지 리액터(시간 기반 펄스)를 그린다 (상태 변경 없음). */
   render(ctx: CanvasRenderingContext2D): void {
     ctx.drawImage(this.staticLayer, 0, 0);
-    const spawn = cellCenter(SPAWN.cx, SPAWN.cy);
-    drawPortal(ctx, spawn.x, spawn.y);
+    for (const s of this.spawns) {
+      const p = cellCenter(s.cx, s.cy);
+      drawPortal(ctx, p.x, p.y); // 스폰 포털을 스폰마다(복수) 그린다(D7.3).
+    }
     const base = cellCenter(BASE.cx, BASE.cy);
     drawReactor(ctx, base.x, base.y, 'cyan');
   }

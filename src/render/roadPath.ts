@@ -12,7 +12,7 @@
 // 실제 PNG 픽셀 분석으로 각 코너가 잇는 두 변을 확정: UL=상+좌, UR=상+우, LL=하+좌, LR=하+우.
 
 import { FlowField, computeFlowField } from '../systems/pathfinding';
-import { SPAWN, BASE, COLS, ROWS, TILE, cellToPixel, type Grid } from '../game/grid';
+import { BASE, DEFAULT_SPAWNS, COLS, ROWS, TILE, cellToPixel, type Grid, type Cell } from '../game/grid';
 import { getSprite, assetsReady } from './sprites';
 
 export type RoadKind = 'h' | 'v' | 'ul' | 'ur' | 'll' | 'lr';
@@ -54,13 +54,13 @@ function pieceKind(inDx: number, inDy: number, outDx: number, outDy: number): Ro
 }
 
 /**
- * SPAWN에서 field.getDir를 따라 BASE까지 걸으며 도로 조각 목록을 만든다.
+ * 지정 스폰에서 field.getDir를 따라 BASE까지 걸으며 도로 조각 목록을 만든다(D7.3: 스폰별 호출).
  * 무한 루프 가드: 칸 수 상한 COLS×ROWS. 도달 불가(막다른 방향 or BASE 미도달)면 빈 배열.
  */
-export function computeRoadCells(field: FlowField): RoadPiece[] {
+export function computeRoadCells(field: FlowField, spawn: Cell = DEFAULT_SPAWNS[0]): RoadPiece[] {
   const cells: Step[] = [];
-  let cx = SPAWN.cx;
-  let cy = SPAWN.cy;
+  let cx = spawn.cx;
+  let cy = spawn.cy;
   const max = COLS * ROWS;
   let reached = false;
 
@@ -103,11 +103,13 @@ export function computeRoadCells(field: FlowField): RoadPiece[] {
 /**
  * D2.2 미리보기 — 고스트 칸(cx,cy)을 임시 벽으로 세운 상태의 예상 경로 조각을 계산해 돌려준다.
  * isPathClear의 임시 벽 패턴과 동일하게 계산 후 칸 상태를 반드시 원복한다. 봉쇄면 빈 배열.
+ * D7.3: 복수 스폰이면 모든 스폰의 예상 경로를 이어 붙인다(겹침은 회색 오버레이라 무해).
  */
 export function computePreviewCells(grid: Grid, cx: number, cy: number): RoadPiece[] {
   const prev = grid.getState(cx, cy) ?? 'empty';
   grid.setState(cx, cy, 'tower');
-  const cells = computeRoadCells(computeFlowField(grid));
+  const field = computeFlowField(grid);
+  const cells = grid.spawns.flatMap((s) => computeRoadCells(field, s));
   grid.setState(cx, cy, prev); // 원복
   return cells;
 }
@@ -127,11 +129,19 @@ const DIRT = 'rgba(58, 44, 30, 0.55)';
 // 고스트 경로 미리보기(D2.2 재사용) — 회색 반투명 사각.
 const PREVIEW = 'rgba(190, 190, 190, 0.30)';
 
-/** 도로 조각을 바닥 위에 그린다. 끝점(스폰·기지)은 포털/리액터가 이미 차지하므로 건너뛴다. */
-export function renderRoad(ctx: CanvasRenderingContext2D, pieces: RoadPiece[], preview = false): void {
+/**
+ * 도로 조각을 바닥 위에 그린다. 끝점(스폰·기지)은 포털/리액터가 이미 차지하므로 건너뛴다.
+ * D7.3: 스폰이 복수일 수 있어 스폰 목록을 받아 각 스폰 칸도 건너뛴다(기본은 단일 스폰).
+ */
+export function renderRoad(
+  ctx: CanvasRenderingContext2D,
+  pieces: RoadPiece[],
+  preview = false,
+  spawns: readonly Cell[] = DEFAULT_SPAWNS,
+): void {
   const ready = assetsReady();
   for (const p of pieces) {
-    if (!preview && (isEndpoint(p, SPAWN) || isEndpoint(p, BASE))) continue; // 포털/리액터 가림 방지.
+    if (!preview && (isEndpoint(p, BASE) || spawns.some((s) => isEndpoint(p, s)))) continue; // 포털/리액터 가림 방지.
     const { x, y } = cellToPixel(p.cx, p.cy);
     if (preview) {
       ctx.fillStyle = PREVIEW;

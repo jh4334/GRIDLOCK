@@ -1,10 +1,9 @@
-// 게임 조립·조율. main.ts는 부트스트랩만 하고, 상태 소유와 update/render 조율은 여기서 한다.
-// 설치/판매/선택/호버/고스트/거부 플래시 상호작용은 game/interaction.ts로 분리했다(M5).
+// 게임 조립·조율. main.ts는 부트스트랩만, 상태 소유·update/render 조율은 여기서 한다(상호작용은 interaction.ts, M5).
 
 import { MouseInput, Keyboard } from '../core/input';
 import { FpsCounter } from '../debug/fps';
 import { DebugSpawner } from '../debug/spawnKeys';
-import { Grid } from './grid';
+import { Grid, type Cell } from './grid';
 import { Economy } from './economy';
 import { computeFlowField, FlowField } from '../systems/pathfinding';
 import type { CombatSystem } from '../systems/combat';
@@ -15,7 +14,7 @@ import { AudioEngine } from '../core/audio';
 import { ScreenShake } from './screenShake';
 import { DecalField } from '../render/decals';
 import { Vignette } from '../render/vignette';
-import { Enemy, createEnemy, spawnSplits } from '../entities/enemy';
+import { Enemy, spawnSplits } from '../entities/enemy';
 import { towerSpec, TowerKind } from '../entities/tower';
 import towersData from '../data/towers.json';
 import { Hud } from '../ui/hud';
@@ -31,7 +30,8 @@ import { UnitSelection } from './unitSelection';
 import { bindGameInput } from './gameInput';
 import { GameFlow } from './flow';
 import { renderDefense } from './gameRender';
-import { computeRoadCells, type RoadPiece } from '../render/roadPath';
+import type { RoadPiece } from '../render/roadPath';
+import { SpawnControl } from './spawnControl';
 import type { BestRecord } from '../core/storage';
 
 const SPEEDS = [1, 2, 3]; // 배속 옵션(구조 상수 — 서브스텝 반복 횟수). 밸런스 수치 아님.
@@ -67,7 +67,8 @@ export class Game {
   private readonly flow: GameFlow; // menu/playing/won/lost 상태머신 + 최고기록 소유.
 
   private flowField: FlowField;
-  private roadCells: RoadPiece[] = []; // 적이 따르는 스폰→기지 최단 경로의 도로 조각(recomputeField에서 갱신).
+  private roadCells: RoadPiece[] = []; // 적이 따르는 (스폰별) 스폰→기지 최단 경로 도로 조각을 이어붙인 것(recomputeField에서 갱신).
+  private readonly spawnControl = new SpawnControl(); // 복수 스폰 라운드로빈 + 도로 조립(D7.3).
   private enemies: Enemy[] = [];
   private speed = 1; // 배속(서브스텝 반복 횟수). update가 게임 월드를 이 횟수만큼 갱신.
   private showFlowDebug = false;
@@ -85,11 +86,11 @@ export class Game {
     this.audio = deps.audio;
     this.input = new MouseInput(canvas);
     this.flowField = computeFlowField(this.grid);
-    this.roadCells = computeRoadCells(this.flowField);
+    this.roadCells = this.spawnControl.roads(this.grid, this.flowField);
     this.lastGold = this.economy.gold;
 
-    // isActive 가드: 정복 모드·타이틀에서 숫자키 스폰이 새지 않도록 격리.
-    this.spawner = new DebugSpawner(this.keyboard, (kind) => this.enemies.push(createEnemy(kind, this.flowField)), () => this.active);
+    // isActive 가드: 정복 모드·타이틀에서 숫자키 스폰이 새지 않도록 격리. 디버그 스폰도 라운드로빈(D7.3).
+    this.spawner = new DebugSpawner(this.keyboard, (kind) => this.enemies.push(this.spawnControl.next(this.grid, this.flowField, kind)), () => this.active);
 
     // 전투(투사체)·근접(병사) 시스템 + 이펙트/사운드/화면흔들림 배선은 battleSystems로 분리.
     const battle = createBattleSystems({ effects: this.effects, audio: this.audio, shake: this.shake, decals: this.decals });
@@ -98,7 +99,7 @@ export class Game {
 
     // 웨이브 스포너 — 스폰 시점의 flowField를 클로저로 주입(설치/판매로 바뀌어도 최신값 사용).
     this.waveManager = new WaveManager({
-      spawn: (kind, hpMult) => this.enemies.push(createEnemy(kind, this.flowField, hpMult)),
+      spawn: (kind, hpMult) => this.enemies.push(this.spawnControl.next(this.grid, this.flowField, kind, hpMult)), // 복수 스폰 라운드로빈 분배(D7.3).
       onWaveClear: (_wave, bonus) => this.awardBonus(bonus), // 클리어·얼리콜은 동일 피드백(골드+사운드).
       onEarlyCall: (bonus) => this.awardBonus(bonus),
       onVictory: () => { this.flow.win(); this.audio.win(); },
@@ -186,9 +187,10 @@ export class Game {
   get best(): BestRecord | null { return this.flow.best; } // 최고기록(타이틀 표시) — App이 읽는다.
   get endlessBest(): number { return this.flow.endlessBest; } // 엔드리스 최고 웨이브(타이틀 표시, D4.3).
 
-  /** 정복→디펜스 진입 — 선택 맵 지형 주입 + 월드 초기화 + 시작. 재시작은 resetWorld가 같은 맵 유지(D4.4→D7.1). */
-  activate(terrain: MapTerrain): void {
-    this.grid.setMap(terrain);
+  /** 정복→디펜스 진입 — 선택 맵 지형·스폰 주입 + 월드 초기화 + 시작. 재시작은 resetWorld가 같은 맵 유지(D4.4→D7.1→D7.3). */
+  activate(terrain: MapTerrain, spawns: Cell[]): void {
+    this.grid.setMap(terrain, spawns);
+    this.spawnControl.reset(); // 새 맵 진입 시 라운드로빈 순번 초기화(startGame→recomputeField가 도로 갱신).
     this.flow.startGame();
     this.active = true;
   }
@@ -199,23 +201,21 @@ export class Game {
     this.flow.toMenu();
   }
 
-  // 필드 재계산 후 살아있는 적 전원 재경로(DESIGN.md 함정 리스트 5번).
+  // 필드 재계산(설치/판매/시작) 후 살아있는 적 전원 재경로(DESIGN.md 함정 리스트 5번).
   private recomputeField(): void {
     this.flowField = computeFlowField(this.grid);
-    this.roadCells = computeRoadCells(this.flowField); // 도로 경로도 함께 재배치(순수 렌더).
+    this.roadCells = this.spawnControl.roads(this.grid, this.flowField); // 스폰별 도로 경로를 이어붙여 재배치(순수 렌더, D7.3).
     for (const e of this.enemies) e.reroute(this.flowField);
   }
 
-  // ── 웨이브 / 배속 ── 클리어·얼리콜 공통 보너스 지급(골드 + 사운드).
-  private awardBonus(bonus: number): void { this.economy.addGold(bonus); this.audio.waveClear(); }
+  private awardBonus(bonus: number): void { this.economy.addGold(bonus); this.audio.waveClear(); } // 클리어·얼리콜 공통 보너스(골드+사운드).
 
   private startNextWave(): void {
     if (this.flow.state !== 'playing') return;
     this.waveManager.startNextWave(() => this.enemies.length); // 적 수 → 얼리콜 보너스 판단(D2.4).
   }
 
-  // N 치트 — 필드의 적을 보상 없이 제거하고 현재 웨이브를 즉시 완료 처리.
-  private skipWave(): void {
+  private skipWave(): void { // N 치트 — 필드의 적을 보상 없이 제거하고 현재 웨이브를 즉시 완료 처리.
     if (this.flow.state !== 'playing') return;
     this.enemies = [];
     this.waveManager.skip();

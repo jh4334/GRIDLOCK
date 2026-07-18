@@ -21,7 +21,8 @@ const BASE_URL = process.env.BASE_URL ?? 'http://localhost:4173/';
 const PW_CHROMIUM = process.env.PW_CHROMIUM ?? '/opt/pw-browsers/chromium';
 
 const GAME_W = 960, GAME_H = 672, TILE = 48;
-const SPAWN = [0, 7], BASE = [19, 7];
+const BASE = [19, 7];
+const DEFAULT_SPAWNS = [[0, 7]]; // spawns 미정의 맵의 기본 단일 스폰(D7.3, maps.ts와 일치).
 
 // title.ts 레이아웃 상수(맵 버튼) — 코드와 반드시 일치.
 const BTN_W = 240, BTN_H = 64, BTN_GAP = 40;
@@ -75,6 +76,10 @@ async function main() {
 
   try {
     for (let i = 0; i < ids.length; i++) await runMap(page, ids[i], i, ids.length, maps[ids[i]]);
+    // D7.3 협공 봉쇄 검사 — 한쪽 스폰만 막는 배치가 거부되는지(협공 맵이 있을 때만).
+    const pincerIdx = ids.indexOf('pincer');
+    check(pincerIdx >= 0, '협공(pincer) 맵이 maps.json에 없음 — D7.3 신규 맵 추가 실패');
+    await pincerBlockade(page, pincerIdx, ids.length);
     stage = 'page-errors';
     check(errors.length === 0, `페이지 런타임 오류 ${errors.length}건: ${errors.join(' | ')}`);
   } finally {
@@ -121,7 +126,11 @@ async function runMap(page, id, index, total, def) {
   const rk = (x, y) => `${x},${y}`;
   const blocked = new Set([...def.terrain.rock, ...def.terrain.water].map(([x, y]) => rk(x, y)));
   const roadSet = new Set(road.map(([x, y]) => rk(x, y)));
-  check(roadSet.has(rk(...SPAWN)), `${id}: 도로가 스폰(0,7)에서 시작하지 않음`);
+  // D7.3: 복수 스폰(협공)이면 모든 스폰이 도로 시작점으로 존재해야 한다(spawns 미정의면 기본 단일).
+  const spawns = def.spawns ?? DEFAULT_SPAWNS;
+  for (const [sx, sy] of spawns) {
+    check(roadSet.has(rk(sx, sy)), `${id}: 도로가 스폰(${sx},${sy})에서 시작하지 않음`);
+  }
   check(roadSet.has(rk(...BASE)), `${id}: 도로가 기지(19,7)에 도달하지 않음`);
   const onTerrain = road.filter(([x, y]) => blocked.has(rk(x, y)));
   check(onTerrain.length === 0, `${id}: 도로 ${onTerrain.length}칸이 지형(rock/water) 위에 놓임 → 우회 실패`);
@@ -134,7 +143,49 @@ async function runMap(page, id, index, total, def) {
   const started = await waitUntil(page, async () => (await nextBtn.getAttribute('data-inprogress')) === 'true', 6000);
   check(started, `${id}: 다음 웨이브를 눌러도 웨이브가 시작되지 않음`);
 
-  process.stdout.write(`[maps-all] ${id}: road=${road.length}칸, 지형우회 OK, 웨이브1 시작 OK\n`);
+  process.stdout.write(`[maps-all] ${id}: spawns=${spawns.length}, road=${road.length}칸, 지형우회 OK, 웨이브1 시작 OK\n`);
+}
+
+// 협공(pincer) 전용 봉쇄 검사(D7.3) — 상단 스폰(0,2)만 완전히 막는 배치가 거부되는지 확인한다.
+// 하단 스폰(0,11)은 여전히 도달 가능하지만, isPathClear는 "모든 스폰" 도달성을 요구하므로 거부되어야 한다.
+async function pincerBlockade(page, index, total) {
+  stage = 'pincer:blockade-enter';
+  await page.goto(BASE_URL);
+  await page.waitForTimeout(1100);
+  const { pt } = await canvasMapper(page);
+  const cell = (cx, cy) => pt(cx * TILE + TILE / 2, cy * TILE + TILE / 2);
+
+  await page.mouse.click(...pt(...mapButtonCenter(index, total)));
+  await page.waitForTimeout(120);
+  await page.mouse.click(...pt(...DEFENSE_BTN));
+  await page.waitForTimeout(500);
+  check(await vis(page, '.tower-btn').isVisible(), 'pincer: 디펜스 진입 후 빌드 메뉴가 안 뜸');
+
+  const selectArrow = () => vis(page, '.tower-btn:has-text("애로우")').click();
+  const placeAt = async (cx, cy) => { await page.mouse.click(...cell(cx, cy)); await page.waitForTimeout(150); };
+
+  // 상단 스폰(0,2)의 세 출구는 (0,1)·(0,3)·(1,2). 앞의 둘을 막고 마지막 (1,2) 설치를 시도하면
+  // 상단 스폰이 완전 봉쇄되므로(하단 스폰은 멀쩡해도) 거부되어야 한다.
+  stage = 'pincer:blockade-build';
+  await selectArrow();
+  await placeAt(0, 1);
+  await placeAt(0, 3);
+  await placeAt(1, 2); // 거부 대상.
+  await page.screenshot({ path: join(OUT, 'maps-pincer-blockade.png') });
+
+  // 판정: 우클릭으로 설치 모드 취소 후 (1,2) 클릭 → 타워가 없어 정보 패널이 안 떠야 한다(거부됨).
+  stage = 'pincer:blockade-verify';
+  await page.mouse.click(...cell(1, 2), { button: 'right' });
+  await page.waitForTimeout(100);
+  await page.mouse.click(...cell(1, 2));
+  await page.waitForTimeout(150);
+  check(!(await vis(page, '.tower-panel').isVisible().catch(() => false)), 'pincer: 한쪽 스폰 봉쇄 칸(1,2)에 타워가 설치됨(거부 실패)');
+
+  // 양성 대조: 실제 설치된 (0,1)을 클릭하면 패널이 떠야 선택 판정이 유효.
+  await page.mouse.click(...cell(0, 1));
+  await page.waitForTimeout(150);
+  check(await vis(page, '.tower-panel').isVisible(), 'pincer: 설치된 타워(0,1) 선택 시 패널 미표시(판정 신뢰 불가)');
+  process.stdout.write('[maps-all] pincer: 한쪽 스폰만 막는 배치 거부 OK\n');
 }
 
 main().catch((err) => {

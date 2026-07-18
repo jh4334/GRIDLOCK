@@ -11,7 +11,7 @@ import { AudioEngine } from './core/audio';
 import { loadAudio, saveAudio, loadDifficulty, saveDifficulty, loadMapId, saveMapId, type DifficultyId, type MapId } from './core/storage';
 import { Game } from './game/game';
 import { ConquestGame } from './conquest/conquestGame';
-import { mapTerrain } from './game/maps';
+import { mapTerrain, mapSpawns } from './game/maps';
 import { renderTitle, hitTitleButton, hitDifficultyButton, hitMapButton } from './ui/title';
 import { tickClock } from './render/sprites';
 
@@ -70,7 +70,7 @@ export class App {
 
   private enterDefense(): void {
     this.mode = 'defense';
-    this.game.activate(mapTerrain(this.mapId)); // 선택 맵의 지형을 주입해 진입(재시작은 같은 맵 유지).
+    this.game.activate(mapTerrain(this.mapId), mapSpawns(this.mapId)); // 선택 맵의 지형·스폰을 주입해 진입(재시작은 같은 맵 유지, D7.3).
   }
 
   private enterConquest(): void {

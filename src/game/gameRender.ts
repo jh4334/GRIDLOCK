@@ -53,7 +53,7 @@ export function renderDefense(ctx: CanvasRenderingContext2D, p: DefenseRenderPar
   if (p.shake.active) ctx.translate(p.shake.x, p.shake.y);
 
   p.grid.render(ctx);
-  renderRoad(ctx, p.roadCells); // 바닥 바로 위 — 적이 따르는 현재 최단 경로를 도로 타일로.
+  renderRoad(ctx, p.roadCells, false, p.grid.spawns); // 바닥 바로 위 — 스폰별 최단 경로를 도로 타일로(스폰 칸은 포털이 가리므로 건너뜀, D7.3).
   p.decals.render(ctx); // 잔해 데칼 — 바닥/도로 위, 엔티티 아래(D2.5).
   if (p.showFlowDebug) renderFlowField(ctx, p.flowField);
 

@@ -10,8 +10,9 @@
 
 import mapsData from '../data/maps.json';
 import type { MapId } from '../core/storage';
+import type { Cell } from './grid';
 
-// [cx, cy] 쌍. maps.json terrain.{rock,water,rough} 각 항목과 1:1.
+// [cx, cy] 쌍. maps.json terrain.{rock,water,rough}·spawns 각 항목과 1:1.
 export type TerrainCell = [number, number];
 
 // 한 맵의 지형 3종 좌표 묶음(정적, 게임 중 불변).
@@ -21,6 +22,9 @@ export interface MapTerrain {
   rough: TerrainCell[];
 }
 
+// 스폰이 정의되지 않은 맵(대부분)의 기본 침입 지점 — 좌측 중앙 단일 스폰(D7.3).
+const DEFAULT_SPAWNS: TerrainCell[] = [[0, 7]];
+
 /** 맵 id의 지형 좌표 묶음. 미정의 id·필드면 빈 배열(안전 폴백). */
 export function mapTerrain(id: MapId): MapTerrain {
   const t = mapsData.maps[id]?.terrain;
@@ -29,6 +33,15 @@ export function mapTerrain(id: MapId): MapTerrain {
     water: (t?.water ?? []) as TerrainCell[],
     rough: (t?.rough ?? []) as TerrainCell[],
   };
+}
+
+/**
+ * 맵 id의 침입 지점 목록(D7.3) — 복수 스폰 지원. maps.json에 spawns가 없으면 기본 단일 스폰.
+ * 기지는 단일 유지(BASE 상수)라 여기선 다루지 않는다.
+ */
+export function mapSpawns(id: MapId): Cell[] {
+  const raw = (mapsData.maps[id] as { spawns?: TerrainCell[] })?.spawns ?? DEFAULT_SPAWNS;
+  return raw.map(([cx, cy]) => ({ cx, cy }));
 }
 
 /** 전체 맵 목록(JSON 정의 순서). 타이틀 버튼을 데이터로 생성하는 데 쓴다(D7.2). */

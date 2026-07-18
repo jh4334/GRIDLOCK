@@ -2,11 +2,10 @@
 //   1) isCellPlaceable: 칸 자체의 기본 조건(범위/타워/스폰·기지/적 점유). 매 프레임 고스트 색에 사용.
 //   2) isPathClear: 봉쇄 검사(BFS 도달성). 설치 직전에만 호출 — 무겁진 않지만 의미가 다르다.
 //
-// 봉쇄 검사는 대상 칸을 임시로 벽('tower')으로 세운 뒤 (스폰→기지)와 (살아있는 모든
-// 적의 현재 칸→기지) 도달성을 확인하고 원상복구한다. 하나라도 막히면 설치 거부.
+// 봉쇄 검사는 대상 칸을 임시로 벽('tower')으로 세운 뒤 (모든 스폰→기지)와 (살아있는 모든
+// 적의 현재 칸→기지) 도달성을 확인하고 원상복구한다. 하나라도 막히면 설치 거부(D7.3: 복수 스폰).
 
 import type { Grid } from '../game/grid';
-import { SPAWN } from '../game/grid';
 import { isReachable } from './pathfinding';
 import type { Enemy } from '../entities/enemy';
 
@@ -24,14 +23,14 @@ export function isCellPlaceable(grid: Grid, enemies: Enemy[], cx: number, cy: nu
 }
 
 /**
- * 대상 칸을 벽으로 세워도 (스폰→기지)와 (모든 적→기지) 경로가 남는지 검사.
- * 검사 후 칸 상태를 반드시 원복한다. 봉쇄면 false → 설치 거부.
+ * 대상 칸을 벽으로 세워도 (모든 스폰→기지)와 (모든 적→기지) 경로가 남는지 검사.
+ * 검사 후 칸 상태를 반드시 원복한다. 하나라도 막히면 false → 설치 거부(D7.3: 한쪽 스폰만 막아도 거부).
  */
 export function isPathClear(grid: Grid, enemies: Enemy[], cx: number, cy: number): boolean {
   const prev = grid.getState(cx, cy) ?? 'empty';
   grid.setState(cx, cy, 'tower');
 
-  let ok = isReachable(grid, SPAWN);
+  let ok = grid.spawns.every((s) => isReachable(grid, s));
   if (ok) {
     for (const e of enemies) {
       if (!isReachable(grid, e.cell)) {

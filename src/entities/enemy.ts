@@ -6,7 +6,7 @@
 // 부드럽게 연속 이동한다.
 
 import enemiesData from '../data/enemies.json';
-import { SPAWN, cellCenter, pixelToCell } from '../game/grid';
+import { DEFAULT_SPAWNS, cellCenter, pixelToCell } from '../game/grid';
 import type { Grid } from '../game/grid';
 import { roughSpeedFactor } from '../game/maps';
 import type { FlowField } from '../systems/pathfinding';
@@ -110,8 +110,9 @@ export class Enemy {
       this.cx = cell.cx;
       this.cy = cell.cy;
     } else {
-      this.cx = SPAWN.cx;
-      this.cy = SPAWN.cy;
+      // startPos 미지정(폴백) — 기본 단일 스폰에서 출발. 복수 스폰은 game이 startPos로 지점을 지정한다(D7.3).
+      this.cx = DEFAULT_SPAWNS[0].cx;
+      this.cy = DEFAULT_SPAWNS[0].cy;
       const c = cellCenter(this.cx, this.cy);
       this.x = c.x;
       this.y = c.y;
