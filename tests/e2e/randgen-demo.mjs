@@ -12,34 +12,18 @@ import { chromium } from 'playwright-core';
 import { mkdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { DEFENSE_BTN, defenseCardCenter, GAME_W } from './titleCoords.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const OUT = join(HERE, 'out');
 const BASE_URL = process.env.BASE_URL ?? 'http://localhost:4173/';
 const PW_CHROMIUM = process.env.PW_CHROMIUM ?? '/opt/pw-browsers/chromium';
 
-const GAME_W = 960, GAME_H = 672;
 const COLS = 20, ROWS = 14, BASE = [19, 7];
 
-// title.ts 레이아웃 상수(맵 버튼) — 코드와 반드시 일치. 8맵(고정 6 + 랜덤·오늘의 맵) 기준.
-const BTN_W = 240, BTN_H = 64, BTN_GAP = 40;
-const MBTN_W = 100, MBTN_H = 32, MBTN_GAP = 6, MAPS_PER_ROW = 3;
-const TOTAL_MAPS = 8; // 고정 6 + 랜덤 + 오늘의 맵.
+// 맵 카드 인덱스(고정 6 + 랜덤·오늘의 맵) — 카드 중앙은 titleCoords.mjs에서 계산.
 const RANDOM_IDX = 6, DAILY_IDX = 7;
-const DEFENSE_BTN = [GAME_W / 2 - (BTN_W + BTN_GAP / 2) + BTN_W / 2, GAME_H * 0.6];
-
-// i번째 맵 버튼의 중앙(캔버스 논리 좌표) — title.ts mapButtons 공식 복제.
-function mapButtonCenter(i, total) {
-  const defenseX = (GAME_W - (BTN_W * 2 + BTN_GAP)) / 2;
-  const centerX = defenseX + BTN_W / 2;
-  const topY = GAME_H * 0.6 - BTN_H / 2 + BTN_H + 22;
-  const row = Math.floor(i / MAPS_PER_ROW), col = i % MAPS_PER_ROW;
-  const rowCount = Math.min(MAPS_PER_ROW, total - row * MAPS_PER_ROW);
-  const rowW = MBTN_W * rowCount + MBTN_GAP * (rowCount - 1);
-  const x = centerX - rowW / 2 + col * (MBTN_W + MBTN_GAP);
-  const y = topY + row * (MBTN_H + MBTN_GAP);
-  return [x + MBTN_W / 2, y + MBTN_H / 2];
-}
+const mapButtonCenter = (i) => defenseCardCenter(i);
 
 let stage = 'init';
 function check(cond, msg) { if (!cond) throw new Error(msg); }
@@ -115,7 +99,7 @@ async function main() {
     // 3) 오늘의 맵 진입 — 버튼 선택 → 저장 확인 → 디펜스 진입 → 시드 표기 캡처.
     stage = 'daily-enter';
     const { box, pt } = await canvasMapper(page);
-    await page.mouse.click(...pt(...mapButtonCenter(DAILY_IDX, TOTAL_MAPS)));
+    await page.mouse.click(...pt(...mapButtonCenter(DAILY_IDX)));
     await page.waitForTimeout(120);
     const savedMap = await page.evaluate(() => {
       try { return JSON.parse(localStorage.getItem('gridlock.save') ?? '{}').map ?? null; } catch { return null; }
@@ -136,7 +120,7 @@ async function main() {
     await page.goto(BASE_URL);
     await page.waitForTimeout(800);
     const m2 = await canvasMapper(page);
-    await page.mouse.click(...m2.pt(...mapButtonCenter(RANDOM_IDX, TOTAL_MAPS)));
+    await page.mouse.click(...m2.pt(...mapButtonCenter(RANDOM_IDX)));
     await page.waitForTimeout(120);
     const savedRandom = await page.evaluate(() => {
       try { return JSON.parse(localStorage.getItem('gridlock.save') ?? '{}').map ?? null; } catch { return null; }

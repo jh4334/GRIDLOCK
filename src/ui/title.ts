@@ -4,23 +4,12 @@
 
 import type { BestRecord, DailyRecord, DifficultyId, MapId, ConquestMapId } from '../core/storage';
 import { animTime } from '../render/sprites';
-import {
-  titleButtons,
-  drawButton,
-  drawDifficultyButtons,
-  drawMapButtons,
-  drawConquestMapButtons,
-  drawDailyBest,
-} from './titleButtons';
+import { titleButtons, drawButton, drawDifficultyButtons } from './titleButtons';
+import { drawDefenseCards, drawConquestCards } from './mapCards';
 
-// hit*·TitleMode는 App이 클릭 판정에 쓰므로 titleButtons에서 재노출(호출부 import 경로 단일화).
-export {
-  hitTitleButton,
-  hitDifficultyButton,
-  hitMapButton,
-  hitConquestMapButton,
-  type TitleMode,
-} from './titleButtons';
+// hit*·TitleMode는 App이 클릭 판정에 쓰므로 하위 모듈에서 재노출(호출부 import 경로 단일화).
+export { hitTitleButton, hitDifficultyButton, type TitleMode } from './titleButtons';
+export { hitDefenseCard, hitConquestCard } from './mapCards';
 
 const COLOR_LOGO = '#e6d38f'; // STEEL GRID — 초원 전장 톤(앰버/올리브).
 const COLOR_SUB = '#a8b48a';
@@ -52,46 +41,45 @@ export function renderTitle(
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
 
-  // 로고 — 네온 글로우(맥동).
-  const glow = 18 + Math.sin(animTime() * 2) * 6;
+  // 로고 — 네온 글로우(맥동). 카드 그리드 공간 확보를 위해 상단에 압축 배치(D7.6).
+  const glow = 16 + Math.sin(animTime() * 2) * 5;
   ctx.save();
-  ctx.font = 'bold 84px system-ui, sans-serif';
+  ctx.font = 'bold 60px system-ui, sans-serif';
   ctx.shadowColor = '#c9b05c';
   ctx.shadowBlur = glow;
   ctx.fillStyle = COLOR_LOGO;
-  ctx.fillText('GRIDLOCK', w / 2, h * 0.22);
+  ctx.fillText('GRIDLOCK', w / 2, 50);
   ctx.shadowBlur = glow * 0.5;
-  ctx.fillText('GRIDLOCK', w / 2, h * 0.22); // 2차 패스로 글로우 강화.
+  ctx.fillText('GRIDLOCK', w / 2, 50); // 2차 패스로 글로우 강화.
   ctx.restore();
 
   // 부제
   ctx.fillStyle = COLOR_SUB;
-  ctx.font = '22px system-ui, sans-serif';
-  ctx.fillText('미로형 타워 디펜스 · 미니 RTS', w / 2, h * 0.22 + 58);
+  ctx.font = '18px system-ui, sans-serif';
+  ctx.fillText('미로형 타워 디펜스 · 미니 RTS', w / 2, 88);
 
   // 모드 버튼(네온)
   const b = titleButtons(w, h);
   drawButton(ctx, b.defense, '디펜스 모드', '#39d5ff', '20웨이브 생존');
   drawButton(ctx, b.conquest, '정복 모드', COLOR_NEON_CONQUEST, '본진 정복 RTS');
 
-  // 하위 선택 버튼(현재 선택 하이라이트).
-  drawMapButtons(ctx, w, h, mapId); // 디펜스 맵(디펜스 아래).
-  drawDailyBest(ctx, w, h, daily, todaySeedVal); // 오늘의 맵 최고기록(그 버튼 옆, D7.5).
-  drawDifficultyButtons(ctx, w, h, difficulty); // 정복 난이도(정복 아래).
-  drawConquestMapButtons(ctx, w, h, conquestMap); // 정복 맵(난이도 아래, D7.4).
+  // 맵 선택 카드 그리드(디펜스 4열×2행, 정복 3카드) + 정복 난이도(현재 선택 하이라이트).
+  drawDefenseCards(ctx, w, h, mapId, todaySeedVal, daily); // 디펜스 맵(디펜스 버튼 아래).
+  drawDifficultyButtons(ctx, w, h, difficulty); // 정복 난이도(정복 버튼 오른쪽).
+  drawConquestCards(ctx, w, h, conquestMap); // 정복 맵(정복 버튼 아래, D7.4).
 
   // 최고기록(디펜스 기준)
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillStyle = COLOR_BEST;
   ctx.font = '18px monospace';
-  ctx.fillText(formatBest(best), w / 2, h * 0.86);
+  ctx.fillText(formatBest(best), w / 2, 604);
 
   // 엔드리스 최고 웨이브(기록이 있을 때만) — 디펜스 최고기록 바로 아래.
   if (endlessBest > 0) {
     ctx.fillStyle = COLOR_NEON_CONQUEST;
     ctx.font = '15px monospace';
-    ctx.fillText(`엔드리스 최고: 웨이브 ${endlessBest}`, w / 2, h * 0.86 + 26);
+    ctx.fillText(`엔드리스 최고: 웨이브 ${endlessBest}`, w / 2, 630);
   }
 
   ctx.restore();

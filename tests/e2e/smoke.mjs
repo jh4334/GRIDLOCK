@@ -14,15 +14,12 @@ import { chromium } from 'playwright-core';
 import { mkdir, readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { DEFENSE_BTN, CONQUEST_BTN, GAME_W, TILE } from './titleCoords.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const OUT = join(HERE, 'out');
 const BASE_URL = process.env.BASE_URL ?? 'http://localhost:4173/';
 const PW_CHROMIUM = process.env.PW_CHROMIUM ?? '/opt/pw-browsers/chromium';
-
-// 캔버스 게임 해상도(index.html의 canvas width/height와 일치). 좌표 환산 기준.
-const GAME_W = 960;
-const TILE = 48;
 
 let stage = 'init'; // 실패 보고용 — 현재 단계 라벨.
 
@@ -91,7 +88,7 @@ async function defenseStage(page) {
 
   // 디펜스 모드 진입(타이틀 버튼 좌표).
   stage = 'defense-enter';
-  await page.mouse.click(...pt(340, 403));
+  await page.mouse.click(...pt(...DEFENSE_BTN));
   await page.waitForTimeout(500);
   check(await vis(page, '.tower-btn').isVisible(), '디펜스 진입 후 빌드 메뉴가 보이지 않음');
 
@@ -182,7 +179,7 @@ async function conquestStage(page) {
   await page.goto(BASE_URL);
   await page.waitForTimeout(1100);
   const { pt, cell } = await canvasMapper(page);
-  await page.mouse.click(...pt(620, 403));
+  await page.mouse.click(...pt(...CONQUEST_BTN));
   await page.waitForTimeout(500);
 
   // HQ(2,11) 선택 → 일꾼 생산 패널 노출.
@@ -240,7 +237,7 @@ async function conquestDefeatStage(page) {
   await page.goto(BASE_URL);
   await page.waitForTimeout(1100);
   const { pt } = await canvasMapper(page);
-  await page.mouse.click(...pt(620, 403));
+  await page.mouse.click(...pt(...CONQUEST_BTN));
   await page.waitForTimeout(500);
 
   // 아무 것도 하지 않고 x3로 방치 — 적 AI가 빌드오더대로 병력을 모아 웨이브를 보내고(첫 웨이브
@@ -265,7 +262,7 @@ async function audioStage(page) {
   await page.goto(BASE_URL);
   await page.waitForTimeout(1100);
   const { pt } = await canvasMapper(page);
-  await page.mouse.click(...pt(340, 403)); // 디펜스 진입(컨트롤 바 노출).
+  await page.mouse.click(...pt(...DEFENSE_BTN)); // 디펜스 진입(컨트롤 바 노출).
   await page.waitForTimeout(400);
 
   const slider = () => vis(page, '#controls .volume-slider');
@@ -284,7 +281,7 @@ async function audioStage(page) {
   stage = 'audio-reload';
   await page.reload();
   await page.waitForTimeout(1100);
-  await page.mouse.click(...pt(340, 403));
+  await page.mouse.click(...pt(...DEFENSE_BTN));
   await page.waitForTimeout(400);
   const restored = await slider().inputValue();
   check(restored === '37', `리로드 후 음량이 복원되지 않음(기대 37, 실제 ${restored})`);

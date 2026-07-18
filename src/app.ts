@@ -13,7 +13,7 @@ import { Game } from './game/game';
 import { ConquestGame } from './conquest/conquestGame';
 import { mapTerrain, mapSpawns } from './game/maps';
 import { generateMap, todaySeed, randomSeed } from './game/mapGen';
-import { renderTitle, hitTitleButton, hitDifficultyButton, hitMapButton, hitConquestMapButton } from './ui/title';
+import { renderTitle, hitTitleButton, hitDifficultyButton, hitDefenseCard, hitConquestCard } from './ui/title';
 import { tickClock } from './render/sprites';
 
 type Mode = 'title' | 'defense' | 'conquest';
@@ -54,13 +54,13 @@ export class App {
         saveDifficulty(diff);
         return;
       }
-      const map = hitMapButton(canvas.width, canvas.height, x, y);
+      const map = hitDefenseCard(canvas.width, canvas.height, x, y);
       if (map) {
         this.mapId = map;
         saveMapId(map);
         return;
       }
-      const cmap = hitConquestMapButton(canvas.width, canvas.height, x, y);
+      const cmap = hitConquestCard(canvas.width, canvas.height, x, y);
       if (cmap) {
         this.conquestMap = cmap;
         saveConquestMap(cmap);

@@ -22,18 +22,15 @@ import { chromium } from 'playwright-core';
 import { mkdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { DEFENSE_BTN, defenseCardCenter, GAME_W, TILE } from './titleCoords.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const OUT = join(HERE, 'out');
 const BASE_URL = process.env.BASE_URL ?? 'http://localhost:4173/';
 const PW_CHROMIUM = process.env.PW_CHROMIUM ?? '/opt/pw-browsers/chromium';
 
-const GAME_W = 960; // 캔버스 게임 해상도(index.html과 일치). 좌표 환산 기준.
-const TILE = 48;
-
-// 타이틀 좌표(캔버스 논리 좌표) — title.ts의 titleButtons/mapButtons 배치와 일치.
-const DEFENSE_BTN = [340, 403]; // 디펜스 모드 버튼 중앙.
-const MAP_CANYON = [340, 473]; // 맵 버튼 중 협곡(index 1, 5맵 3열 접기 레이아웃 — title.ts mapButtons와 일치).
+// 타이틀 좌표(캔버스 논리 좌표) — titleCoords.mjs(= titleButtons/mapCards 레이아웃)에서 계산.
+const MAP_CANYON = defenseCardCenter(1); // 디펜스 카드 중 협곡(index 1: classic=0·canyon=1).
 
 let stage = 'init';
 

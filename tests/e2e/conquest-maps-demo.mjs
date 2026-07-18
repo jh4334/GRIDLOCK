@@ -13,15 +13,12 @@ import { chromium } from 'playwright-core';
 import { mkdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { CONQUEST_BTN, GAME_W, TILE } from './titleCoords.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const OUT = join(HERE, 'out');
 const BASE_URL = process.env.BASE_URL ?? 'http://localhost:4173/';
 const PW_CHROMIUM = process.env.PW_CHROMIUM ?? '/opt/pw-browsers/chromium';
-
-const GAME_W = 960;
-const TILE = 48;
-const CONQUEST_BTN = [620, 403]; // 정복 모드 버튼 중앙(타이틀).
 
 let stage = 'init';
 function check(cond, msg) {

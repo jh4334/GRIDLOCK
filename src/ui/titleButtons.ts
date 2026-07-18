@@ -1,14 +1,12 @@
-// 타이틀 버튼 기하·클릭 판정·렌더 헬퍼(D7.4에서 title.ts에서 분리 — 300줄 규칙).
-// title.ts는 renderTitle에서 이 draw* 함수를 호출하고, App은 hit* 함수로 클릭을 모드/선택으로 옮긴다.
-//
-// 버튼 4종:
+// 타이틀 모드 버튼·난이도 버튼 기하·클릭 판정·렌더(D7.4 분리 → D7.6 레이아웃 개편).
+// 맵 선택은 D7.6에서 썸네일 카드로 개편되어 mapCards.ts로 옮겼다. 여기 남는 것:
 //   모드 버튼(디펜스/정복) — titleButtons/drawButton
-//   난이도 3버튼(정복 아래)  — difficultyButtons/drawDifficultyButtons (정복 네온)
-//   디펜스 맵 버튼(디펜스 아래, 여러 줄) — mapButtons/drawMapButtons (디펜스 네온)
-//   정복 맵 버튼(난이도 아래) — conquestMapButtons/drawConquestMapButtons (정복 네온, D7.4)
+//   난이도 3버튼(정복 버튼 오른쪽) — difficultyButtons/drawDifficultyButtons
+//
+// 레이아웃(캔버스 960×672, D7.6): 디펜스 버튼은 위(카드 그리드 위), 정복 버튼은 아래에
+// 난이도 3버튼과 한 줄을 이룬다. 카드 그리드는 각 모드 버튼 rect를 앵커로 mapCards가 배치한다.
 
-import { conquestMapList, type DailyRecord, type DifficultyId, type MapId, type ConquestMapId } from '../core/storage';
-import { mapList } from '../game/maps';
+import type { DifficultyId } from '../core/storage';
 
 export type TitleMode = 'defense' | 'conquest';
 
@@ -20,11 +18,12 @@ export interface Rect {
 }
 
 const COLOR_NEON_CONQUEST = '#ff4d6a';
-const COLOR_NEON_DEFENSE = '#39d5ff';
 
-const BTN_W = 240;
-const BTN_H = 64;
-const BTN_GAP = 40;
+// 모드 버튼(디펜스 위·정복 아래). 카드 그리드 두 줄을 사이에 넣을 수 있게 y를 벌린다.
+const BTN_W = 200;
+const BTN_H = 46;
+export const DEFENSE_BTN_Y = 108;
+export const CONQUEST_BTN_Y = 402;
 
 const DIFF_ORDER: { id: DifficultyId; label: string }[] = [
   { id: 'easy', label: '쉬움' },
@@ -34,30 +33,19 @@ const DIFF_ORDER: { id: DifficultyId; label: string }[] = [
 const DBTN_W = 74;
 const DBTN_H = 34;
 const DBTN_GAP = 6;
-
-// 디펜스 맵 버튼 — 목록은 maps.json에서 파생, 한 줄 MAPS_PER_ROW개씩 접어 여러 줄로 배치.
-const MBTN_W = 100;
-const MBTN_H = 32;
-const MBTN_GAP = 6;
-const MAPS_PER_ROW = 3;
-
-// 정복 맵 버튼(D7.4) — 목록은 conquest.json에서 파생. 난이도 줄 아래 한 줄 배치(맵 3종).
-const CMBTN_W = 90;
-const CMBTN_H = 30;
-const CMBTN_GAP = 6;
+const PAIR_GAP = 20; // 정복 버튼 ↔ 난이도 묶음 간격.
 
 function inside(r: Rect, px: number, py: number): boolean {
   return px >= r.x && px <= r.x + r.w && py >= r.y && py <= r.y + r.h;
 }
 
-// 두 모드 버튼의 사각형(렌더·클릭 판정 공유). 캔버스 크기에 맞춰 가운데 정렬.
-export function titleButtons(w: number, h: number): { defense: Rect; conquest: Rect } {
-  const totalW = BTN_W * 2 + BTN_GAP;
-  const startX = (w - totalW) / 2;
-  const y = h * 0.6 - BTN_H / 2;
+// 두 모드 버튼 사각형. 디펜스는 상단 중앙, 정복은 하단에서 난이도 묶음과 함께 가운데 정렬.
+export function titleButtons(w: number, _h: number): { defense: Rect; conquest: Rect } {
+  const diffTotalW = DBTN_W * 3 + DBTN_GAP * 2;
+  const pairW = BTN_W + PAIR_GAP + diffTotalW;
   return {
-    defense: { x: startX, y, w: BTN_W, h: BTN_H },
-    conquest: { x: startX + BTN_W + BTN_GAP, y, w: BTN_W, h: BTN_H },
+    defense: { x: w / 2 - BTN_W / 2, y: DEFENSE_BTN_Y, w: BTN_W, h: BTN_H },
+    conquest: { x: w / 2 - pairW / 2, y: CONQUEST_BTN_Y, w: BTN_W, h: BTN_H },
   };
 }
 
@@ -69,12 +57,11 @@ export function hitTitleButton(w: number, h: number, px: number, py: number): Ti
   return null;
 }
 
-// 난이도 버튼 3개 사각형. 정복 버튼 중앙 아래에 가로로 정렬.
+// 난이도 버튼 3개 — 정복 버튼 오른쪽에 세로 중앙을 맞춰 가로로 정렬.
 export function difficultyButtons(w: number, h: number): { id: DifficultyId; label: string; rect: Rect }[] {
   const conquest = titleButtons(w, h).conquest;
-  const totalW = DBTN_W * 3 + DBTN_GAP * 2;
-  const startX = conquest.x + conquest.w / 2 - totalW / 2;
-  const y = conquest.y + conquest.h + 22;
+  const startX = conquest.x + conquest.w + PAIR_GAP;
+  const y = conquest.y + (conquest.h - DBTN_H) / 2;
   return DIFF_ORDER.map((d, i) => ({
     id: d.id,
     label: d.label,
@@ -88,134 +75,39 @@ export function hitDifficultyButton(w: number, h: number, px: number, py: number
   return null;
 }
 
-// 디펜스 맵 버튼 사각형. 디펜스 버튼 중앙 아래에 MAPS_PER_ROW개씩 줄바꿈 정렬(D7.2).
-export function mapButtons(w: number, h: number): { id: MapId; label: string; rect: Rect }[] {
-  const defense = titleButtons(w, h).defense;
-  const centerX = defense.x + defense.w / 2;
-  const topY = defense.y + defense.h + 22;
-  const maps = mapList();
-  return maps.map((m, i) => {
-    const row = Math.floor(i / MAPS_PER_ROW);
-    const col = i % MAPS_PER_ROW;
-    const rowCount = Math.min(MAPS_PER_ROW, maps.length - row * MAPS_PER_ROW);
-    const rowW = MBTN_W * rowCount + MBTN_GAP * (rowCount - 1);
-    const x = centerX - rowW / 2 + col * (MBTN_W + MBTN_GAP);
-    const y = topY + row * (MBTN_H + MBTN_GAP);
-    return { id: m.id, label: m.name, rect: { x, y, w: MBTN_W, h: MBTN_H } };
-  });
-}
-
-/** 클릭 좌표가 어느 디펜스 맵 버튼 위인지. 아니면 null. */
-export function hitMapButton(w: number, h: number, px: number, py: number): MapId | null {
-  for (const m of mapButtons(w, h)) if (inside(m.rect, px, py)) return m.id;
-  return null;
-}
-
-// 정복 맵 버튼 사각형(D7.4). 정복 난이도 줄 아래에 한 줄 가로 정렬.
-export function conquestMapButtons(w: number, h: number): { id: ConquestMapId; label: string; rect: Rect }[] {
-  const conquest = titleButtons(w, h).conquest;
-  const centerX = conquest.x + conquest.w / 2;
-  const maps = conquestMapList();
-  const totalW = CMBTN_W * maps.length + CMBTN_GAP * (maps.length - 1);
-  const startX = centerX - totalW / 2;
-  // 난이도 줄(높이 DBTN_H) 아래로 한 칸 내려 라벨 여백 확보.
-  const y = conquest.y + conquest.h + 22 + DBTN_H + 22;
-  return maps.map((m, i) => ({
-    id: m.id,
-    label: m.name,
-    rect: { x: startX + i * (CMBTN_W + CMBTN_GAP), y, w: CMBTN_W, h: CMBTN_H },
-  }));
-}
-
-/** 클릭 좌표가 어느 정복 맵 버튼 위인지. 아니면 null. */
-export function hitConquestMapButton(w: number, h: number, px: number, py: number): ConquestMapId | null {
-  for (const m of conquestMapButtons(w, h)) if (inside(m.rect, px, py)) return m.id;
-  return null;
-}
-
 // ── 렌더 ──────────────────────────────────────────────────────────
-// 선택형 버튼 한 줄(난이도·맵 공통) — 현재 선택은 네온으로 강조, 나머지는 어둡게. 라벨은 줄 위.
-function drawSelectableRow(
-  ctx: CanvasRenderingContext2D,
-  btns: { label: string; rect: Rect; selected: boolean }[],
-  neon: string,
-  selBg: string,
-  selText: string,
-  groupLabel: string,
-  fontPx: number,
-): void {
+/** 난이도 3버튼 렌더(현재 선택 강조, 정복 네온). 라벨은 줄 위. */
+export function drawDifficultyButtons(ctx: CanvasRenderingContext2D, w: number, h: number, current: DifficultyId): void {
+  const btns = difficultyButtons(w, h);
   const first = btns[0].rect;
   ctx.save();
   ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
   ctx.font = '13px system-ui, sans-serif';
   ctx.fillStyle = 'rgba(200, 220, 255, 0.55)';
-  ctx.fillText(groupLabel, first.x, first.y - 12);
+  ctx.fillText('난이도', first.x, first.y - 12);
   ctx.restore();
 
-  for (const { label, rect, selected } of btns) {
+  for (const { label, rect, id } of btns) {
+    const selected = id === current;
     ctx.save();
-    ctx.fillStyle = selected ? selBg : 'rgba(20, 28, 44, 0.85)';
+    ctx.fillStyle = selected ? 'rgba(60, 26, 34, 0.9)' : 'rgba(20, 28, 44, 0.85)';
     ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
-    ctx.strokeStyle = selected ? neon : 'rgba(120, 170, 230, 0.35)';
+    ctx.strokeStyle = selected ? COLOR_NEON_CONQUEST : 'rgba(120, 170, 230, 0.35)';
     if (selected) {
-      ctx.shadowColor = neon;
+      ctx.shadowColor = COLOR_NEON_CONQUEST;
       ctx.shadowBlur = 10;
     }
     ctx.lineWidth = selected ? 2 : 1;
     ctx.strokeRect(rect.x + 1, rect.y + 1, rect.w - 2, rect.h - 2);
     ctx.restore();
 
-    ctx.fillStyle = selected ? selText : 'rgba(200, 220, 255, 0.6)';
+    ctx.fillStyle = selected ? '#ffd7de' : 'rgba(200, 220, 255, 0.6)';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.font = `${selected ? 'bold ' : ''}${fontPx}px system-ui, sans-serif`;
+    ctx.font = `${selected ? 'bold ' : ''}15px system-ui, sans-serif`;
     ctx.fillText(label, rect.x + rect.w / 2, rect.y + rect.h / 2);
   }
-}
-
-/** 난이도 3버튼 렌더(현재 선택 강조, 정복 네온). */
-export function drawDifficultyButtons(ctx: CanvasRenderingContext2D, w: number, h: number, current: DifficultyId): void {
-  const btns = difficultyButtons(w, h).map((b) => ({ label: b.label, rect: b.rect, selected: b.id === current }));
-  drawSelectableRow(ctx, btns, COLOR_NEON_CONQUEST, 'rgba(60, 26, 34, 0.9)', '#ffd7de', '난이도', 15);
-}
-
-/** 디펜스 맵 버튼 렌더(현재 선택 강조, 디펜스 네온). */
-export function drawMapButtons(ctx: CanvasRenderingContext2D, w: number, h: number, current: MapId): void {
-  const btns = mapButtons(w, h).map((b) => ({ label: b.label, rect: b.rect, selected: b.id === current }));
-  drawSelectableRow(ctx, btns, COLOR_NEON_DEFENSE, 'rgba(20, 44, 56, 0.9)', '#d7f4ff', '맵', 14);
-}
-
-/**
- * 오늘의 맵 최고기록 표시(D7.5) — 저장 기록의 시드가 오늘 시드와 같을 때만, '오늘의 맵' 버튼
- * 오른쪽 빈 슬롯(맵 그리드 3열 중 마지막 줄의 남는 칸)에 소형으로 그린다. 시드가 다르면(지난 날) 숨김.
- */
-export function drawDailyBest(
-  ctx: CanvasRenderingContext2D,
-  w: number,
-  h: number,
-  record: DailyRecord | null,
-  todaySeedVal: number,
-): void {
-  if (!record || record.seed !== todaySeedVal) return;
-  const daily = mapButtons(w, h).find((b) => b.id === 'daily');
-  if (!daily) return;
-
-  const x = daily.rect.x + daily.rect.w + MBTN_GAP; // 버튼 오른쪽 빈 슬롯.
-  const y = daily.rect.y + daily.rect.h / 2;
-  ctx.save();
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'middle';
-  ctx.font = 'bold 12px monospace';
-  ctx.fillStyle = COLOR_NEON_DEFENSE;
-  ctx.fillText(`최고 W${record.wave}${record.cleared ? ' ✓' : ''}`, x, y);
-  ctx.restore();
-}
-
-/** 정복 맵 버튼 렌더(현재 선택 강조, 정복 네온, D7.4). */
-export function drawConquestMapButtons(ctx: CanvasRenderingContext2D, w: number, h: number, current: ConquestMapId): void {
-  const btns = conquestMapButtons(w, h).map((b) => ({ label: b.label, rect: b.rect, selected: b.id === current }));
-  drawSelectableRow(ctx, btns, COLOR_NEON_CONQUEST, 'rgba(60, 26, 34, 0.9)', '#ffd7de', '정복 맵', 13);
 }
 
 /** 모드 버튼(디펜스/정복) — 어두운 패널 + 네온 테두리 글로우 + 라벨·부제. */
@@ -233,9 +125,9 @@ export function drawButton(ctx: CanvasRenderingContext2D, r: Rect, label: string
   ctx.fillStyle = neon;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.font = 'bold 24px system-ui, sans-serif';
-  ctx.fillText(label, r.x + r.w / 2, r.y + r.h / 2 - 8);
-  ctx.font = '13px system-ui, sans-serif';
+  ctx.font = 'bold 22px system-ui, sans-serif';
+  ctx.fillText(label, r.x + r.w / 2, r.y + r.h / 2 - 7);
+  ctx.font = '12px system-ui, sans-serif';
   ctx.fillStyle = 'rgba(200, 220, 255, 0.65)';
-  ctx.fillText(sub, r.x + r.w / 2, r.y + r.h / 2 + 16);
+  ctx.fillText(sub, r.x + r.w / 2, r.y + r.h / 2 + 14);
 }

@@ -14,33 +14,18 @@ import { chromium } from 'playwright-core';
 import { mkdir, readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { DEFENSE_BTN, defenseCardCenter, GAME_W, TILE } from './titleCoords.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const OUT = join(HERE, 'out');
 const BASE_URL = process.env.BASE_URL ?? 'http://localhost:4173/';
 const PW_CHROMIUM = process.env.PW_CHROMIUM ?? '/opt/pw-browsers/chromium';
 
-const GAME_W = 960, GAME_H = 672, TILE = 48;
 const BASE = [19, 7];
 const DEFAULT_SPAWNS = [[0, 7]]; // spawns 미정의 맵의 기본 단일 스폰(D7.3, maps.ts와 일치).
 
-// title.ts 레이아웃 상수(맵 버튼) — 코드와 반드시 일치.
-const BTN_W = 240, BTN_H = 64, BTN_GAP = 40;
-const MBTN_W = 100, MBTN_H = 32, MBTN_GAP = 6, MAPS_PER_ROW = 3;
-const DEFENSE_BTN = [GAME_W / 2 - (BTN_W + BTN_GAP / 2) + BTN_W / 2, GAME_H * 0.6]; // 디펜스 버튼 중앙.
-
-// i번째 맵 버튼의 중앙 좌표(캔버스 논리 좌표). title.ts mapButtons와 동일 공식.
-function mapButtonCenter(i, total) {
-  const defenseX = (GAME_W - (BTN_W * 2 + BTN_GAP)) / 2; // titleButtons.defense.x
-  const centerX = defenseX + BTN_W / 2;
-  const topY = GAME_H * 0.6 - BTN_H / 2 + BTN_H + 22;
-  const row = Math.floor(i / MAPS_PER_ROW), col = i % MAPS_PER_ROW;
-  const rowCount = Math.min(MAPS_PER_ROW, total - row * MAPS_PER_ROW);
-  const rowW = MBTN_W * rowCount + MBTN_GAP * (rowCount - 1);
-  const x = centerX - rowW / 2 + col * (MBTN_W + MBTN_GAP);
-  const y = topY + row * (MBTN_H + MBTN_GAP);
-  return [x + MBTN_W / 2, y + MBTN_H / 2];
-}
+// i번째 맵 카드의 중앙 좌표 — titleCoords.mjs(= mapCards 레이아웃)에서 계산.
+const mapButtonCenter = (i) => defenseCardCenter(i);
 
 let stage = 'init';
 function check(cond, msg) { if (!cond) throw new Error(msg); }
