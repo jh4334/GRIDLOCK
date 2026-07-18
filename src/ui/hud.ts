@@ -9,7 +9,8 @@ export interface WaveInfo {
 }
 
 export class Hud {
-  render(ctx: CanvasRenderingContext2D, economy: Economy, wave: WaveInfo): void {
+  // seed가 주어지면(랜덤·오늘의 맵) 웨이브 아래에 "시드 #n"을 소형으로 덧붙인다(D7.5).
+  render(ctx: CanvasRenderingContext2D, economy: Economy, wave: WaveInfo, seed: number | null = null): void {
     ctx.save();
     ctx.font = '16px monospace';
     ctx.textBaseline = 'top';
@@ -25,6 +26,12 @@ export class Hud {
     ctx.fillStyle = '#9ad0ff';
     const waveText = wave.endless ? `웨이브 ${wave.current} (엔드리스)` : `웨이브 ${wave.current}/${wave.total}`;
     ctx.fillText(waveText, right, 48);
+
+    if (seed !== null) {
+      ctx.font = '12px monospace';
+      ctx.fillStyle = 'rgba(180, 200, 230, 0.85)';
+      ctx.fillText(`시드 #${seed}`, right, 70);
+    }
 
     ctx.restore();
   }

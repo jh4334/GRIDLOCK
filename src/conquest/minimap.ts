@@ -6,6 +6,7 @@ import { COLS, ROWS, TILE } from '../game/grid';
 
 // 미니맵에 찍을 좌표 묶음(칸 기반: 크리스탈·구조물 / 픽셀 기반: 이동 유닛).
 export interface MinimapData {
+  rocks: { cx: number; cy: number }[]; // 맵 지형 바위(D7.4) — 통행·건설 불가 칸.
   // amount/maxAmount로 잔량 비율을 계산해 점 알파에 반영(고갈 임박 시 희미). Crystal이 구조적으로 만족.
   crystals: { cx: number; cy: number; depleted: boolean; amount: number; maxAmount: number }[];
   playerStructures: { cx: number; cy: number }[]; // 아군 건물 + 본진.
@@ -23,6 +24,7 @@ const MOB = 3; // 유닛 점 크기(px).
 
 const COLOR_BG = 'rgba(10, 14, 20, 0.62)';
 const COLOR_BORDER = 'rgba(224, 179, 87, 0.7)';
+const COLOR_ROCK = '#6b6357';
 const COLOR_CRYSTAL = '#5be0d0';
 const COLOR_PLAYER_STRUCT = '#3a78d0';
 const COLOR_ENEMY_STRUCT = '#c0433a';
@@ -46,6 +48,8 @@ export function renderMinimap(ctx: CanvasRenderingContext2D, data: MinimapData):
     ctx.fillRect(ox + cx * CELL, oy + cy * CELL, CELL, CELL);
     ctx.globalAlpha = 1;
   };
+  // 지형 바위: 크리스탈·구조물보다 먼저(바닥 위) 칠해 회색 장애물을 드러낸다.
+  for (const r of data.rocks) cellDot(r.cx, r.cy, COLOR_ROCK);
   // 크리스탈: 잔량 비율을 알파에 반영(0.3~1.0) — 고갈 임박 시 희미, 고갈되면 미표시.
   for (const c of data.crystals) {
     if (c.depleted) continue;

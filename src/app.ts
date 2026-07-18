@@ -8,12 +8,14 @@
 import { GameLoop } from './core/loop';
 import { MouseInput } from './core/input';
 import { AudioEngine } from './core/audio';
-import { loadAudio, saveAudio, loadDifficulty, saveDifficulty, loadMapId, saveMapId, type DifficultyId, type MapId } from './core/storage';
+import { loadAudio, saveAudio, loadDifficulty, saveDifficulty, loadMapId, saveMapId, loadConquestMap, saveConquestMap, loadDaily, type DifficultyId, type MapId, type ConquestMapId } from './core/storage';
 import { Game } from './game/game';
 import { ConquestGame } from './conquest/conquestGame';
-import { mapRocks } from './game/maps';
-import { renderTitle, hitTitleButton, hitDifficultyButton, hitMapButton } from './ui/title';
+import { mapTerrain, mapSpawns } from './game/maps';
+import { generateMap, todaySeed, randomSeed } from './game/mapGen';
+import { renderTitle, hitTitleButton, hitDifficultyButton, hitDefenseCard, hitConquestCard } from './ui/title';
 import { tickClock } from './render/sprites';
+import { exposeSeedPlay } from './debug/balanceProbe';
 
 type Mode = 'title' | 'defense' | 'conquest';
 
@@ -26,6 +28,7 @@ export class App {
   private mode: Mode = 'title';
   private difficulty: DifficultyId = loadDifficulty(); // 정복 난이도(타이틀에서 선택, 하이라이트·저장).
   private mapId: MapId = loadMapId(); // 디펜스 맵(평원/협곡) — 타이틀에서 선택, 진입 시 적용(D4.4).
+  private conquestMap: ConquestMapId = loadConquestMap(); // 정복 맵(표준/능선/사분면) — 타이틀에서 선택, 진입 시 적용(D7.4).
 
   constructor(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D) {
     this.ctx = ctx;
@@ -52,15 +55,29 @@ export class App {
         saveDifficulty(diff);
         return;
       }
-      const map = hitMapButton(canvas.width, canvas.height, x, y);
+      const map = hitDefenseCard(canvas.width, canvas.height, x, y);
       if (map) {
         this.mapId = map;
         saveMapId(map);
         return;
       }
+      const cmap = hitConquestCard(canvas.width, canvas.height, x, y);
+      if (cmap) {
+        this.conquestMap = cmap;
+        saveConquestMap(cmap);
+        return;
+      }
       const hit = hitTitleButton(canvas.width, canvas.height, x, y);
       if (hit === 'defense') this.enterDefense();
       else if (hit === 'conquest') this.enterConquest();
+    });
+
+    // D7.7 밸런스 측정 — 고정 시드 랜덤맵 디펜스 강제 진입(측정 봇 전용). 타이틀엔 시드 강제 경로가
+    // 없어 debug로만 노출한다. enterDefense의 랜덤 분기와 동일하되 시드만 외부에서 고정한다.
+    exposeSeedPlay((seed) => {
+      this.mode = 'defense';
+      const g = generateMap(seed);
+      this.game.activate(g.terrain, g.spawns, { seed, mode: 'random' });
     });
   }
 
@@ -70,7 +87,15 @@ export class App {
 
   private enterDefense(): void {
     this.mode = 'defense';
-    this.game.activate(mapRocks(this.mapId)); // 선택 맵의 바위를 주입해 진입(재시작은 같은 맵 유지).
+    // 랜덤·오늘의 맵은 시드로 절차 생성한다(D7.5). 랜덤=진입 시 새 시드, 오늘의 맵=날짜 시드(하루 동일).
+    // 시드는 activate 시점에 Game에 고정되어, 재시작해도 같은 맵을 유지한다.
+    if (this.mapId === 'random' || this.mapId === 'daily') {
+      const seed = this.mapId === 'daily' ? todaySeed() : randomSeed();
+      const g = generateMap(seed);
+      this.game.activate(g.terrain, g.spawns, { seed, mode: this.mapId });
+    } else {
+      this.game.activate(mapTerrain(this.mapId), mapSpawns(this.mapId)); // 고정 맵의 지형·스폰을 주입해 진입(재시작은 같은 맵 유지, D7.3).
+    }
   }
 
   private enterConquest(): void {
@@ -94,6 +119,6 @@ export class App {
   private render(): void {
     if (this.mode === 'defense') this.game.render();
     else if (this.mode === 'conquest') this.conquest.render();
-    else renderTitle(this.ctx, this.game.best, this.difficulty, this.mapId, this.game.endlessBest); // 타이틀(최고기록 + 난이도 + 맵).
+    else renderTitle(this.ctx, this.game.best, this.difficulty, this.mapId, this.conquestMap, this.game.endlessBest, loadDaily(), todaySeed()); // 타이틀(최고기록 + 난이도 + 디펜스/정복 맵 + 오늘의 맵 기록).
   }
 }

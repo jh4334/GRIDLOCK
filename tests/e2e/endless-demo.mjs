@@ -14,14 +14,12 @@ import { chromium } from 'playwright-core';
 import { mkdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { DEFENSE_BTN, GAME_W } from './titleCoords.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const OUT = join(HERE, 'out');
 const BASE_URL = process.env.BASE_URL ?? 'http://localhost:4173/';
 const PW_CHROMIUM = process.env.PW_CHROMIUM ?? '/opt/pw-browsers/chromium';
-
-const GAME_W = 960; // 캔버스 게임 해상도(index.html과 일치). 좌표 환산 기준.
-const DEFENSE_BTN = [340, 403]; // 타이틀 디펜스 모드 버튼 중앙.
 
 let stage = 'init';
 

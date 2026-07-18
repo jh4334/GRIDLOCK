@@ -197,7 +197,7 @@ export class Interaction {
     if (!t) return;
     const refund = sellRefund(t);
     this.towers.splice(this.towers.indexOf(t), 1);
-    this.deps.grid.setState(t.cx, t.cy, 'empty');
+    this.deps.grid.restoreTerrainCell(t.cx, t.cy); // rough 위였다면 rough로 복원(D7.1).
     this.deps.economy.addGold(refund);
     this.deselect();
     this.deps.recomputeField(); // 판매로 열린 길 반영 + 전 적 reroute.

@@ -38,6 +38,7 @@ export interface EnemyDeps {
   buildings: Building[]; // 공유 — 적 건물을 push한다.
   units: CombatUnit[]; // 공유 — 웨이브 때 적 유닛 부분집합을 명령한다.
   difficulty: DifficultySettings; // 난이도 설정(공격 주기·빌드오더·시작 자원).
+  layout: Record<BuildKind, number[][]>; // 맵별 적 건물 고정 좌표(D7.4 — conquest.json maps.*.enemyLayout).
   onBuildComplete(b: Building): void; // 배럭 완성 시 유닛 배치 등(월드 공유 로직).
   onWaveLaunch?(): void; // 공격 웨이브 출발 시(≥1기 출발) — 경보음 배선용.
 }
@@ -115,7 +116,7 @@ export class EnemyAI {
     }
 
     const kind = step;
-    const layout = C.enemy.layout as Record<BuildKind, number[][]>;
+    const layout = this.deps.layout;
     const coord = layout[kind]?.[this.layoutIdx[kind]];
     if (!coord) {
       this.stepIndex++; // 좌표 소진 — 스텝 건너뜀.

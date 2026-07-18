@@ -7,7 +7,7 @@
 // update(dt)/render(ctx) 분리 규칙 유지 — 여기엔 렌더 로직이 없고 상태 전이만 담당한다.
 
 import type { GameState } from './state';
-import { type BestRecord, loadBest, updateBest, loadEndlessBest, updateEndlessBest } from '../core/storage';
+import { type BestRecord, loadBest, updateBest, loadEndlessBest, updateEndlessBest, updateDaily } from '../core/storage';
 import type { Economy } from './economy';
 import type { Grid } from './grid';
 import type { Interaction } from './interaction';
@@ -38,6 +38,7 @@ export class GameFlow {
   private _state: GameState = 'menu'; // 부팅 즉시 타이틀 화면(M9).
   private _best: BestRecord | null = loadBest(); // localStorage 최고기록(타이틀·승패 화면 표시).
   private _endlessBest = loadEndlessBest(); // 엔드리스 최고 도달 웨이브(D4.3, 0 = 기록 없음).
+  private _dailySeed: number | null = null; // 오늘의 맵 시드(D7.5). null이면 시드별 기록을 남기지 않음.
 
   constructor(private deps: FlowDeps) {
     this.setGameplayUiVisible(false); // menu 상태 — 게임 UI(빌드 메뉴·컨트롤 바)는 숨긴 채 시작.
@@ -52,6 +53,11 @@ export class GameFlow {
   /** 엔드리스 최고 도달 웨이브(타이틀 표시용). 0이면 기록 없음. */
   get endlessBest(): number {
     return this._endlessBest;
+  }
+
+  /** 오늘의 맵 시드 설정(D7.5) — Game.activate가 호출. daily면 시드, 그 외(고정·랜덤 맵)는 null. */
+  setDailySeed(seed: number | null): void {
+    this._dailySeed = seed;
   }
 
   // 타이틀 → 게임 시작(클릭/Space). 월드 초기화 + 게임 UI 노출.
@@ -105,13 +111,12 @@ export class GameFlow {
   }
 
   // 승/패 확정 시 최고기록 갱신. 승리는 총 웨이브 클리어, 패배는 도달 웨이브 기준.
+  // 오늘의 맵(_dailySeed≠null)이면 같은 웨이브 값으로 시드별 최고기록도 갱신한다(D7.5).
   private record(cleared: boolean): void {
     const wm = this.deps.waveManager;
-    this._best = updateBest({
-      wave: cleared ? wm.total : wm.current,
-      lives: this.deps.economy.lives,
-      cleared,
-    });
+    const wave = cleared ? wm.total : wm.current;
+    this._best = updateBest({ wave, lives: this.deps.economy.lives, cleared });
+    if (this._dailySeed !== null) updateDaily(this._dailySeed, wave, cleared);
   }
 
   // 게임 월드 초기화 — 페이지 리로드 없이 시작값으로 되돌린다(리스너·DOM 재생성 없음).

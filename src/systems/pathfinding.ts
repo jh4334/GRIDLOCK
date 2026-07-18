@@ -5,7 +5,9 @@
 // 기지에 닿는지(dist)"와 "기지 쪽 다음 칸으로 향하는 방향(dir)"을 알게 된다.
 // 적은 매 칸에서 이 방향만 따라가면 최단 경로로 기지에 도달한다.
 
-import { Grid, BASE } from '../game/grid';
+import { Grid, BASE, type Cell } from '../game/grid';
+
+export type { Cell };
 
 // 상, 하, 좌, 우.
 const DIRS: ReadonlyArray<readonly [number, number]> = [
@@ -14,11 +16,6 @@ const DIRS: ReadonlyArray<readonly [number, number]> = [
   [-1, 0],
   [1, 0],
 ];
-
-export interface Cell {
-  cx: number;
-  cy: number;
-}
 
 export class FlowField {
   readonly cols: number;

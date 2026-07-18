@@ -27,8 +27,28 @@ export interface AudioSettings {
   muted: boolean;
 }
 
+/** 오늘의 맵 최고기록(D7.5) — 시드별. 같은 시드일 때만 비교·갱신한다. */
+export interface DailyRecord {
+  seed: number; // YYYYMMDD.
+  wave: number; // 도달 웨이브(클리어 시 총 웨이브 수).
+  cleared: boolean; // 클리어(승리) 여부.
+}
+
+import mapsData from '../data/maps.json';
+import conquestData from '../data/conquest.json';
+import { coerceBest, coerceEndless, coerceAudio, coerceDifficulty, coerceMap, coerceDaily, coerceConquestMap } from './saveCoerce';
+
 export type DifficultyId = 'easy' | 'normal' | 'hard';
-export type MapId = 'classic' | 'canyon';
+// 디펜스 맵 id — maps.json의 키 목록에서 파생(데이터 주도, D7.2). 맵 추가 시 JSON만 고치면 된다.
+// 'random'(진입 시 새 시드)·'daily'(오늘의 맵, 시드=날짜)는 절차 생성 맵이라 JSON에 없고 여기서 합류(D7.5).
+export type MapId = keyof typeof mapsData.maps | 'random' | 'daily';
+// 정복 맵 id — conquest.json maps 키에서 파생(데이터 주도, D7.4).
+export type ConquestMapId = keyof typeof conquestData.maps;
+
+/** 정복 맵 목록(정의 순서, id·이름) — 타이틀 버튼을 데이터로 생성. */
+export function conquestMapList(): { id: ConquestMapId; name: string }[] {
+  return (Object.keys(conquestData.maps) as ConquestMapId[]).map((id) => ({ id, name: conquestData.maps[id].name }));
+}
 
 /** 통합 저장 객체(v2). null/기본값은 "해당 항목 미기록"을 뜻한다. */
 export interface SaveData {
@@ -38,6 +58,8 @@ export interface SaveData {
   audio: AudioSettings | null;
   difficulty: DifficultyId;
   map: MapId;
+  conquestMap: ConquestMapId;
+  daily: DailyRecord | null; // 오늘의 맵 최고기록(시드별, D7.5).
 }
 
 const SAVE_KEY = 'gridlock.save';
@@ -53,48 +75,7 @@ const LEGACY_KEYS = {
 } as const;
 
 function defaults(): SaveData {
-  return { v: SCHEMA_VERSION, best: null, endlessBest: 0, audio: null, difficulty: 'normal', map: 'classic' };
-}
-
-// ── 필드 정규화(손상 값은 기본값으로) ─────────────────────────────
-function coerceBest(x: unknown): BestRecord | null {
-  if (
-    typeof x !== 'object' ||
-    x === null ||
-    typeof (x as BestRecord).wave !== 'number' ||
-    typeof (x as BestRecord).lives !== 'number' ||
-    typeof (x as BestRecord).cleared !== 'boolean'
-  ) {
-    return null;
-  }
-  const r = x as BestRecord;
-  return { wave: r.wave, lives: r.lives, cleared: r.cleared };
-}
-
-function coerceEndless(x: unknown): number {
-  const n = Number(x);
-  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
-}
-
-function coerceAudio(x: unknown): AudioSettings | null {
-  if (
-    typeof x !== 'object' ||
-    x === null ||
-    typeof (x as AudioSettings).volume !== 'number' ||
-    typeof (x as AudioSettings).muted !== 'boolean'
-  ) {
-    return null;
-  }
-  const s = x as AudioSettings;
-  return { volume: Math.min(1, Math.max(0, s.volume)), muted: s.muted };
-}
-
-function coerceDifficulty(x: unknown): DifficultyId {
-  return x === 'easy' || x === 'normal' || x === 'hard' ? x : 'normal';
-}
-
-function coerceMap(x: unknown): MapId {
-  return x === 'classic' || x === 'canyon' ? x : 'classic';
+  return { v: SCHEMA_VERSION, best: null, endlessBest: 0, audio: null, difficulty: 'normal', map: 'classic', conquestMap: 'standard', daily: null };
 }
 
 /** 파싱된 임의 값 → 정상 SaveData(필드별로 정규화, 손상 필드는 기본값). */
@@ -107,6 +88,8 @@ function normalize(parsed: unknown): SaveData {
     audio: coerceAudio(o.audio),
     difficulty: coerceDifficulty(o.difficulty),
     map: coerceMap(o.map),
+    conquestMap: coerceConquestMap(o.conquestMap),
+    daily: coerceDaily(o.daily),
   };
 }
 
@@ -264,4 +247,36 @@ export function loadMapId(): MapId {
 /** 디펜스 맵 저장. 예외(프라이빗 모드 등)는 조용히 무시. */
 export function saveMapId(id: MapId): void {
   patchSave({ map: id });
+}
+
+// ── 정복 맵 선택(D7.4) ────────────────────────────────────────────
+/** 저장된 정복 맵을 읽는다. 없거나 손상/예외면 'standard'. */
+export function loadConquestMap(): ConquestMapId {
+  return readSave().conquestMap;
+}
+
+/** 정복 맵 저장. 예외(프라이빗 모드 등)는 조용히 무시. */
+export function saveConquestMap(id: ConquestMapId): void {
+  patchSave({ conquestMap: id });
+}
+
+// ── 오늘의 맵 최고기록(D7.5) ──────────────────────────────────────
+/** 저장된 오늘의 맵 기록을 읽는다. 없거나 손상/예외면 null(시드 비교는 호출부에서). */
+export function loadDaily(): DailyRecord | null {
+  return readSave().daily;
+}
+
+/**
+ * 오늘의 맵 기록 갱신 — 저장된 기록이 같은 시드일 때만 비교(더 좋으면 갱신), 다른 시드(새 날)면
+ * 새 기록으로 덮어쓴다. "더 좋음"은 디펜스 최고기록과 동일 기준(클리어 우선 → 높은 웨이브).
+ */
+export function updateDaily(seed: number, wave: number, cleared: boolean): DailyRecord {
+  const next: DailyRecord = { seed, wave, cleared };
+  const prev = loadDaily();
+  if (prev && prev.seed === seed) {
+    const better = prev.cleared !== cleared ? cleared : wave > prev.wave;
+    if (!better) return prev;
+  }
+  patchSave({ daily: next });
+  return next;
 }

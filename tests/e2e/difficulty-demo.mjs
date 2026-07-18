@@ -12,18 +12,12 @@ import { chromium } from 'playwright-core';
 import { mkdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { CONQUEST_BTN, DIFF_EASY, DIFF_HARD, GAME_W } from './titleCoords.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const OUT = join(HERE, 'out');
 const BASE_URL = process.env.BASE_URL ?? 'http://localhost:4173/';
 const PW_CHROMIUM = process.env.PW_CHROMIUM ?? '/opt/pw-browsers/chromium';
-
-const GAME_W = 960; // 캔버스 게임 해상도(index.html과 일치). 좌표 환산 기준.
-
-// 타이틀 좌표(캔버스 논리 좌표). title.ts의 titleButtons/difficultyButtons 배치와 일치.
-const CONQUEST_BTN = [620, 403]; // 정복 모드 버튼 중앙.
-const DIFF_EASY = [540, 468]; // 난이도 3버튼 중 좌(쉬움).
-const DIFF_HARD = [700, 468]; // 난이도 3버튼 중 우(어려움).
 
 let stage = 'init';
 

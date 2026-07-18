@@ -1,10 +1,9 @@
-// 게임 조립·조율. main.ts는 부트스트랩만 하고, 상태 소유와 update/render 조율은 여기서 한다.
-// 설치/판매/선택/호버/고스트/거부 플래시 상호작용은 game/interaction.ts로 분리했다(M5).
+// 게임 조립·조율. main.ts는 부트스트랩만, 상태 소유·update/render 조율은 여기서 한다(상호작용은 interaction.ts, M5).
 
 import { MouseInput, Keyboard } from '../core/input';
 import { FpsCounter } from '../debug/fps';
 import { DebugSpawner } from '../debug/spawnKeys';
-import { Grid } from './grid';
+import { Grid, type Cell } from './grid';
 import { Economy } from './economy';
 import { computeFlowField, FlowField } from '../systems/pathfinding';
 import type { CombatSystem } from '../systems/combat';
@@ -15,7 +14,7 @@ import { AudioEngine } from '../core/audio';
 import { ScreenShake } from './screenShake';
 import { DecalField } from '../render/decals';
 import { Vignette } from '../render/vignette';
-import { Enemy, createEnemy, spawnSplits } from '../entities/enemy';
+import { Enemy, spawnSplits } from '../entities/enemy';
 import { towerSpec, TowerKind } from '../entities/tower';
 import towersData from '../data/towers.json';
 import { Hud } from '../ui/hud';
@@ -24,12 +23,16 @@ import { Controls } from '../ui/controls';
 import { WaveManager } from './waves';
 import { DebugCheats } from '../debug/cheats';
 import { publishStressTelemetry } from '../debug/stressTelemetry';
+import { publishTerrainTelemetry } from '../debug/terrainTelemetry';
+import { publishBalanceTelemetry } from '../debug/balanceProbe';
+import type { MapTerrain } from './maps';
 import { Interaction } from './interaction';
 import { UnitSelection } from './unitSelection';
 import { bindGameInput } from './gameInput';
 import { GameFlow } from './flow';
 import { renderDefense } from './gameRender';
-import { computeRoadCells, type RoadPiece } from '../render/roadPath';
+import type { RoadPiece } from '../render/roadPath';
+import { SpawnControl } from './spawnControl';
 import type { BestRecord } from '../core/storage';
 
 const SPEEDS = [1, 2, 3]; // 배속 옵션(구조 상수 — 서브스텝 반복 횟수). 밸런스 수치 아님.
@@ -65,13 +68,15 @@ export class Game {
   private readonly flow: GameFlow; // menu/playing/won/lost 상태머신 + 최고기록 소유.
 
   private flowField: FlowField;
-  private roadCells: RoadPiece[] = []; // 적이 따르는 스폰→기지 최단 경로의 도로 조각(recomputeField에서 갱신).
+  private roadCells: RoadPiece[] = []; // 적이 따르는 (스폰별) 스폰→기지 최단 경로 도로 조각을 이어붙인 것(recomputeField에서 갱신).
+  private readonly spawnControl = new SpawnControl(); // 복수 스폰 라운드로빈 + 도로 조립(D7.3).
   private enemies: Enemy[] = [];
   private speed = 1; // 배속(서브스텝 반복 횟수). update가 게임 월드를 이 횟수만큼 갱신.
   private showFlowDebug = false;
   private showHitbox = false; // H 치트로 토글하는 히트박스 오버레이.
   private lastGold: number; // 골드 변동 감지용(변할 때만 메뉴 갱신).
   private active = false; // App이 디펜스 모드를 활성화했을 때만 입력·update 처리.
+  private currentSeed: number | null = null; // 랜덤·오늘의 맵이면 활성화 시 고정한 시드(HUD 표기, D7.5).
 
   constructor(
     canvas: HTMLCanvasElement,
@@ -83,11 +88,11 @@ export class Game {
     this.audio = deps.audio;
     this.input = new MouseInput(canvas);
     this.flowField = computeFlowField(this.grid);
-    this.roadCells = computeRoadCells(this.flowField);
+    this.roadCells = this.spawnControl.roads(this.grid, this.flowField);
     this.lastGold = this.economy.gold;
 
-    // isActive 가드: 정복 모드·타이틀에서 숫자키 스폰이 새지 않도록 격리.
-    this.spawner = new DebugSpawner(this.keyboard, (kind) => this.enemies.push(createEnemy(kind, this.flowField)), () => this.active);
+    // isActive 가드: 정복 모드·타이틀에서 숫자키 스폰이 새지 않도록 격리. 디버그 스폰도 라운드로빈(D7.3).
+    this.spawner = new DebugSpawner(this.keyboard, (kind) => this.enemies.push(this.spawnControl.next(this.grid, this.flowField, kind)), () => this.active);
 
     // 전투(투사체)·근접(병사) 시스템 + 이펙트/사운드/화면흔들림 배선은 battleSystems로 분리.
     const battle = createBattleSystems({ effects: this.effects, audio: this.audio, shake: this.shake, decals: this.decals });
@@ -96,12 +101,11 @@ export class Game {
 
     // 웨이브 스포너 — 스폰 시점의 flowField를 클로저로 주입(설치/판매로 바뀌어도 최신값 사용).
     this.waveManager = new WaveManager({
-      spawn: (kind, hpMult) => this.enemies.push(createEnemy(kind, this.flowField, hpMult)),
+      spawn: (kind, hpMult) => this.enemies.push(this.spawnControl.next(this.grid, this.flowField, kind, hpMult)), // 복수 스폰 라운드로빈 분배(D7.3).
       onWaveClear: (_wave, bonus) => this.awardBonus(bonus), // 클리어·얼리콜은 동일 피드백(골드+사운드).
       onEarlyCall: (bonus) => this.awardBonus(bonus),
       onVictory: () => { this.flow.win(); this.audio.win(); },
-      // 시작/완료/리셋 시점에만 다음 웨이브 구성을 프리뷰에 반영(매 프레임 아님).
-      onWaveChange: () => this.controls.setWavePreview(this.waveManager.nextWaveComposition()),
+      onWaveChange: () => this.controls.setWavePreview(this.waveManager.nextWaveComposition()), // 시작/완료/리셋 시점에만 프리뷰 갱신(매 프레임 아님).
     });
 
     this.controls = new Controls({
@@ -184,9 +188,14 @@ export class Game {
   get best(): BestRecord | null { return this.flow.best; } // 최고기록(타이틀 표시) — App이 읽는다.
   get endlessBest(): number { return this.flow.endlessBest; } // 엔드리스 최고 웨이브(타이틀 표시, D4.3).
 
-  /** 정복→디펜스 진입 — 선택 맵 바위 주입 + 월드 초기화 + 시작. 재시작은 resetWorld가 같은 맵 유지(D4.4). */
-  activate(rocks: [number, number][]): void {
-    this.grid.setMap(rocks);
+  // 디펜스 진입 — 맵 지형·스폰 주입 + 월드 초기화 + 시작(재시작은 resetWorld가 같은 맵 유지, D4.4→D7.3).
+  // 랜덤·오늘의 맵은 opts로 시드를 받아 활성화 시점에 고정하고(재시작해도 동일 시드), 오늘의 맵이면
+  // 시드를 flow에 넘겨 승/패 시 시드별 최고기록을 갱신하게 한다(랜덤은 기록 안 함, D7.5).
+  activate(terrain: MapTerrain, spawns: Cell[], opts?: { seed?: number; mode?: 'random' | 'daily' }): void {
+    this.grid.setMap(terrain, spawns);
+    this.currentSeed = opts?.seed ?? null;
+    this.flow.setDailySeed(opts?.mode === 'daily' ? this.currentSeed : null);
+    this.spawnControl.reset(); // 새 맵 진입 시 라운드로빈 순번 초기화(startGame→recomputeField가 도로 갱신).
     this.flow.startGame();
     this.active = true;
   }
@@ -197,23 +206,21 @@ export class Game {
     this.flow.toMenu();
   }
 
-  // 필드 재계산 후 살아있는 적 전원 재경로(DESIGN.md 함정 리스트 5번).
+  // 필드 재계산(설치/판매/시작) 후 살아있는 적 전원 재경로(DESIGN.md 함정 리스트 5번).
   private recomputeField(): void {
     this.flowField = computeFlowField(this.grid);
-    this.roadCells = computeRoadCells(this.flowField); // 도로 경로도 함께 재배치(순수 렌더).
+    this.roadCells = this.spawnControl.roads(this.grid, this.flowField); // 스폰별 도로 경로를 이어붙여 재배치(순수 렌더, D7.3).
     for (const e of this.enemies) e.reroute(this.flowField);
   }
 
-  // ── 웨이브 / 배속 ── 클리어·얼리콜 공통 보너스 지급(골드 + 사운드).
-  private awardBonus(bonus: number): void { this.economy.addGold(bonus); this.audio.waveClear(); }
+  private awardBonus(bonus: number): void { this.economy.addGold(bonus); this.audio.waveClear(); } // 클리어·얼리콜 공통 보너스(골드+사운드).
 
   private startNextWave(): void {
     if (this.flow.state !== 'playing') return;
     this.waveManager.startNextWave(() => this.enemies.length); // 적 수 → 얼리콜 보너스 판단(D2.4).
   }
 
-  // N 치트 — 필드의 적을 보상 없이 제거하고 현재 웨이브를 즉시 완료 처리.
-  private skipWave(): void {
+  private skipWave(): void { // N 치트 — 필드의 적을 보상 없이 제거하고 현재 웨이브를 즉시 완료 처리.
     if (this.flow.state !== 'playing') return;
     this.enemies = [];
     this.waveManager.skip();
@@ -221,8 +228,7 @@ export class Game {
 
   private setSpeed(s: number): void { this.speed = s; this.controls.setActiveSpeed(s); }
 
-  // ── update / render ─────────────────────────────────────────
-  // FPS·입력·플래시는 프레임당 1회, 월드 갱신은 배속만큼 반복(App이 디펜스 활성 프레임에만 호출).
+  // ── update / render ── FPS·입력·플래시는 프레임당 1회, 월드 갱신은 배속만큼 반복(디펜스 활성 프레임만).
   update(dt: number): void {
     this.audio.resetFrame(); // 프레임당 발사/명중음 스로틀 카운터 리셋.
     this.fps.update(dt);
@@ -234,12 +240,16 @@ export class Game {
     this.vignette.update(dt); // 기지 피격 비네트도 실시간 페이드(연출 — 배속 무관).
 
     // 게임 월드는 playing 상태에서만, 배속 수만큼 서브스텝으로 갱신.
-    if (this.flow.state === 'playing') {
-      for (let i = 0; i < this.speed; i++) this.updateWorld(dt);
-    }
+    if (this.flow.state === 'playing') for (let i = 0; i < this.speed; i++) this.updateWorld(dt);
 
     this.syncUi();
     publishStressTelemetry(this.enemies.length, this.flow.state === 'playing'); // D5.1 스트레스 하네스(읽기 전용).
+    publishTerrainTelemetry(this.enemies.reduce((n, e) => n + (e.onRough ? 1 : 0), 0), this.roadCells); // rough 감속 + 도로 경로(읽기 전용).
+    publishBalanceTelemetry({ // D7.7 밸런스 측정 봇용(읽기 전용) — 골드/라이프/웨이브/상태.
+      gold: this.economy.gold, lives: this.economy.lives, wave: this.waveManager.current,
+      state: this.flow.state, inProgress: this.waveManager.inProgress,
+      canStart: this.waveManager.canStart, endless: this.waveManager.isEndless,
+    });
   }
 
   // 게임 월드 1스텝(적·전투·라이프·필터·웨이브·승패). 배속 시 이 함수만 반복된다.
@@ -249,7 +259,7 @@ export class Game {
 
     // 근접 전투는 적 이동보다 먼저 — 블로킹(enemy.blocked)을 세운 뒤 적 update가 이동을 건너뛴다.
     this.melee.update(dt, this.interaction.barracks, this.enemies, this.economy);
-    for (const e of this.enemies) e.update(dt, this.flowField);
+    for (const e of this.enemies) e.update(dt, this.flowField, this.grid);
     // 전투(타겟팅·발사·명중·데미지·처치 골드)는 combat 시스템이 담당.
     this.combat.update(dt, this.interaction.towers, this.enemies, this.economy, this.flowField);
     for (const e of this.enemies) if (e.reachedBase) { this.economy.loseLife(1); this.vignette.trigger(); }
@@ -286,15 +296,11 @@ export class Game {
 
   render(): void {
     renderDefense(this.ctx, {
-      canvas: this.canvas, shake: this.shake,
-      grid: this.grid, roadCells: this.roadCells,
+      canvas: this.canvas, shake: this.shake, grid: this.grid, roadCells: this.roadCells,
       showFlowDebug: this.showFlowDebug, flowField: this.flowField,
-      interaction: this.interaction, enemies: this.enemies,
-      unitSelection: this.unitSelection, combat: this.combat,
-      effects: this.effects, decals: this.decals, vignette: this.vignette,
-      showHitbox: this.showHitbox, hud: this.hud,
-      economy: this.economy, waveManager: this.waveManager,
-      flow: this.flow, fps: this.fps,
+      interaction: this.interaction, enemies: this.enemies, unitSelection: this.unitSelection, combat: this.combat,
+      effects: this.effects, decals: this.decals, vignette: this.vignette, showHitbox: this.showHitbox, hud: this.hud,
+      economy: this.economy, waveManager: this.waveManager, flow: this.flow, fps: this.fps, seed: this.currentSeed,
     });
   }
 }

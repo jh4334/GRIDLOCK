@@ -2,8 +2,6 @@
   "startCrystal": 150,
   "hq": {
     "hp": 900,
-    "playerCell": [2, 11],
-    "enemyCell": [17, 2],
     "workerCost": 50,
     "workerBuildTime": 4,
     "queueMax": 5
@@ -26,10 +24,7 @@
     "amount": {
       "home": 300,
       "center": 800
-    },
-    "playerCells": [[4, 9], [5, 9], [4, 10], [5, 10]],
-    "enemyCells": [[14, 3], [15, 3], [14, 4], [15, 4]],
-    "centerCells": [[9, 6], [10, 7]]
+    }
   },
   "unit": {
     "hp": 55,
@@ -94,13 +89,7 @@
   },
   "enemy": {
     "workerCount": 2,
-    "waveDuration": 35,
-    "layout": {
-      "depot": [[18, 2]],
-      "barracks": [[18, 3], [18, 4], [18, 5]],
-      "factory": [[16, 4]],
-      "turret": [[16, 5]]
-    }
+    "waveDuration": 35
   },
   "difficulty": {
     "easy": {
@@ -117,6 +106,58 @@
       "attackInterval": 95,
       "startCrystal": 220,
       "buildOrder": ["worker", "worker", "depot", "barracks", "barracks", "factory", "turret", "barracks"]
+    }
+  },
+  "maps": {
+    "standard": {
+      "name": "표준 전장",
+      "hq": { "player": [2, 11], "enemy": [17, 2] },
+      "crystals": {
+        "player": [[4, 9], [5, 9], [4, 10], [5, 10]],
+        "enemy": [[14, 3], [15, 3], [14, 4], [15, 4]],
+        "center": [[9, 6], [10, 7]]
+      },
+      "enemyLayout": {
+        "depot": [[18, 2]],
+        "barracks": [[18, 3], [18, 4], [18, 5]],
+        "factory": [[16, 4]],
+        "turret": [[16, 5]]
+      }
+    },
+    "ridge": {
+      "name": "능선 전장",
+      "hq": { "player": [2, 11], "enemy": [17, 2] },
+      "terrain": {
+        "rock": [
+          [10, 3], [10, 4], [10, 5], [10, 6], [10, 7], [10, 8], [10, 9], [10, 10]
+        ]
+      },
+      "crystals": {
+        "player": [[3, 9], [4, 9], [3, 10], [4, 10]],
+        "enemy": [[15, 3], [16, 3], [15, 4], [16, 4]],
+        "center": [[10, 1], [10, 12]]
+      },
+      "enemyLayout": {
+        "depot": [[18, 2]],
+        "barracks": [[18, 3], [18, 4], [18, 5]],
+        "factory": [[16, 6]],
+        "turret": [[16, 7]]
+      }
+    },
+    "quadrant": {
+      "name": "사분면",
+      "hq": { "player": [2, 11], "enemy": [17, 2] },
+      "crystals": {
+        "player": [[3, 11], [4, 11], [3, 12], [4, 12]],
+        "enemy": [[14, 1], [15, 1], [14, 2], [15, 2]],
+        "center": [[3, 2], [4, 2], [15, 11], [16, 11]]
+      },
+      "enemyLayout": {
+        "depot": [[18, 3]],
+        "barracks": [[18, 4], [18, 5], [17, 5]],
+        "factory": [[16, 4]],
+        "turret": [[16, 3]]
+      }
     }
   }
 }
