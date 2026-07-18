@@ -31,6 +31,11 @@ export function mapTerrain(id: MapId): MapTerrain {
   };
 }
 
+/** 전체 맵 목록(JSON 정의 순서). 타이틀 버튼을 데이터로 생성하는 데 쓴다(D7.2). */
+export function mapList(): { id: MapId; name: string }[] {
+  return (Object.keys(mapsData.maps) as MapId[]).map((id) => ({ id, name: mapsData.maps[id].name }));
+}
+
 /** rough 칸 위 적 이속 배율(밸런스 수치, maps.json 최상위). 프로스트 슬로우와 곱연산. */
 export function roughSpeedFactor(): number {
   return mapsData.roughSpeedFactor;

@@ -27,8 +27,11 @@ export interface AudioSettings {
   muted: boolean;
 }
 
+import mapsData from '../data/maps.json';
+
 export type DifficultyId = 'easy' | 'normal' | 'hard';
-export type MapId = 'classic' | 'canyon';
+// 디펜스 맵 id — maps.json의 키 목록에서 파생(데이터 주도, D7.2). 맵 추가 시 JSON만 고치면 된다.
+export type MapId = keyof typeof mapsData.maps;
 
 /** 통합 저장 객체(v2). null/기본값은 "해당 항목 미기록"을 뜻한다. */
 export interface SaveData {
@@ -94,7 +97,9 @@ function coerceDifficulty(x: unknown): DifficultyId {
 }
 
 function coerceMap(x: unknown): MapId {
-  return x === 'classic' || x === 'canyon' ? x : 'classic';
+  return typeof x === 'string' && Object.prototype.hasOwnProperty.call(mapsData.maps, x)
+    ? (x as MapId)
+    : 'classic';
 }
 
 /** 파싱된 임의 값 → 정상 SaveData(필드별로 정규화, 손상 필드는 기본값). */

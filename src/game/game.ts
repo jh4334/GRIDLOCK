@@ -239,7 +239,7 @@ export class Game {
 
     this.syncUi();
     publishStressTelemetry(this.enemies.length, this.flow.state === 'playing'); // D5.1 스트레스 하네스(읽기 전용).
-    publishTerrainTelemetry(this.enemies.reduce((n, e) => n + (e.onRough ? 1 : 0), 0)); // D7.1 rough 감속 실측(읽기 전용).
+    publishTerrainTelemetry(this.enemies.reduce((n, e) => n + (e.onRough ? 1 : 0), 0), this.roadCells); // rough 감속 + 도로 경로(읽기 전용).
   }
 
   // 게임 월드 1스텝(적·전투·라이프·필터·웨이브·승패). 배속 시 이 함수만 반복된다.

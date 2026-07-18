@@ -33,7 +33,7 @@ const TILE = 48;
 
 // 타이틀 좌표(캔버스 논리 좌표) — title.ts의 titleButtons/mapButtons 배치와 일치.
 const DEFENSE_BTN = [340, 403]; // 디펜스 모드 버튼 중앙.
-const MAP_CANYON = [399, 474]; // 맵 2버튼 중 우(협곡).
+const MAP_CANYON = [340, 473]; // 맵 버튼 중 협곡(index 1, 5맵 3열 접기 레이아웃 — title.ts mapButtons와 일치).
 
 let stage = 'init';
 

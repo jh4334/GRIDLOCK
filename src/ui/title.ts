@@ -3,6 +3,7 @@
 // 최고기록 문자열 포맷(formatBest)은 승/패 오버레이와 공유한다.
 
 import type { BestRecord, DifficultyId, MapId } from '../core/storage';
+import { mapList } from '../game/maps';
 import { animTime } from '../render/sprites';
 
 const COLOR_LOGO = '#e6d38f'; // STEEL GRID — 초원 전장 톤(앰버/올리브).
@@ -34,14 +35,12 @@ const DBTN_W = 74;
 const DBTN_H = 34;
 const DBTN_GAP = 6;
 
-// 디펜스 맵 선택(D4.4) — 디펜스 버튼 바로 아래 2개 소형 버튼(평원/협곡). 난이도 버튼 패턴 재사용.
-const MAP_ORDER: { id: MapId; label: string }[] = [
-  { id: 'classic', label: '평원' },
-  { id: 'canyon', label: '협곡' },
-];
-const MBTN_W = 112;
-const MBTN_H = 34;
+// 디펜스 맵 선택(D4.4→D7.2) — 디펜스 버튼 아래 소형 버튼. 목록은 maps.json에서 파생(하드코딩 제거),
+// 맵이 늘어나면 한 줄 MAPS_PER_ROW개씩 접어 여러 줄로 배치한다(레이아웃 겹침 방지).
+const MBTN_W = 100;
+const MBTN_H = 32;
 const MBTN_GAP = 6;
+const MAPS_PER_ROW = 3;
 
 // 두 모드 버튼의 사각형(렌더·클릭 판정 공유). 캔버스 크기에 맞춰 가운데 정렬.
 export function titleButtons(w: number, h: number): { defense: Rect; conquest: Rect } {
@@ -84,16 +83,21 @@ export function hitDifficultyButton(w: number, h: number, px: number, py: number
   return null;
 }
 
-// 맵 버튼 2개 사각형(렌더·클릭 판정 공유). 디펜스 버튼 중앙 아래에 가로로 정렬(D4.4).
-export function mapButtons(w: number, h: number): { id: MapId; rect: Rect }[] {
+// 맵 버튼 사각형(렌더·클릭 판정 공유). 디펜스 버튼 중앙 아래에 MAPS_PER_ROW개씩 줄바꿈 정렬(D7.2).
+export function mapButtons(w: number, h: number): { id: MapId; label: string; rect: Rect }[] {
   const defense = titleButtons(w, h).defense;
-  const totalW = MBTN_W * MAP_ORDER.length + MBTN_GAP * (MAP_ORDER.length - 1);
-  const startX = defense.x + defense.w / 2 - totalW / 2;
-  const y = defense.y + defense.h + 22;
-  return MAP_ORDER.map((m, i) => ({
-    id: m.id,
-    rect: { x: startX + i * (MBTN_W + MBTN_GAP), y, w: MBTN_W, h: MBTN_H },
-  }));
+  const centerX = defense.x + defense.w / 2;
+  const topY = defense.y + defense.h + 22;
+  const maps = mapList();
+  return maps.map((m, i) => {
+    const row = Math.floor(i / MAPS_PER_ROW);
+    const col = i % MAPS_PER_ROW;
+    const rowCount = Math.min(MAPS_PER_ROW, maps.length - row * MAPS_PER_ROW);
+    const rowW = MBTN_W * rowCount + MBTN_GAP * (rowCount - 1);
+    const x = centerX - rowW / 2 + col * (MBTN_W + MBTN_GAP);
+    const y = topY + row * (MBTN_H + MBTN_GAP);
+    return { id: m.id, label: m.name, rect: { x, y, w: MBTN_W, h: MBTN_H } };
+  });
 }
 
 /** 클릭 좌표가 어느 맵 버튼 위인지. 아니면 null. */
@@ -262,8 +266,8 @@ function drawMapButtons(ctx: CanvasRenderingContext2D, w: number, h: number, cur
     ctx.fillStyle = selected ? '#d7f4ff' : 'rgba(200, 220, 255, 0.6)';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.font = `${selected ? 'bold ' : ''}15px system-ui, sans-serif`;
-    ctx.fillText(MAP_ORDER[i].label, rect.x + rect.w / 2, rect.y + rect.h / 2);
+    ctx.font = `${selected ? 'bold ' : ''}14px system-ui, sans-serif`;
+    ctx.fillText(btns[i].label, rect.x + rect.w / 2, rect.y + rect.h / 2);
   }
 }
 
