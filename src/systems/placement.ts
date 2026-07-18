@@ -14,7 +14,7 @@ import type { Enemy } from '../entities/enemy';
 export function isCellPlaceable(grid: Grid, enemies: Enemy[], cx: number, cy: number): boolean {
   if (!grid.inBounds(cx, cy)) return false;
   const state = grid.getState(cx, cy);
-  if (state === 'tower' || state === 'rock') return false; // 이미 타워 / 바위(장애물) 칸
+  if (state === 'tower' || state === 'rock' || state === 'water') return false; // 타워/바위/물 칸(rough는 건설 가능, D7.1)
   if (grid.isSpawn(cx, cy) || grid.isBase(cx, cy)) return false; // 스폰·기지 칸
   for (const e of enemies) {
     const c = e.cell; // 적이 현재 점유 중인 칸

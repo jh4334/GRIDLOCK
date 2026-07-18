@@ -7,6 +7,8 @@
 
 import enemiesData from '../data/enemies.json';
 import { SPAWN, cellCenter, pixelToCell } from '../game/grid';
+import type { Grid } from '../game/grid';
+import { roughSpeedFactor } from '../game/maps';
 import type { FlowField } from '../systems/pathfinding';
 import { drawEnemy, drawSlowOverlay, drawShieldRing, drawRegenPulse, drawSplitMark, visualSkin } from '../render/enemySprites';
 import { drawHpBar } from '../render/hpbar';
@@ -33,6 +35,7 @@ interface EnemySpec {
 }
 
 const EPS = 1e-6;
+const ROUGH_FACTOR = roughSpeedFactor(); // rough 이속 배율(maps.json 소유). 정적이라 1회 읽는다.
 
 // HP바 표시 상수(밸런스 아님, 시각 상수).
 const HP_BAR_HEIGHT = 3;
@@ -57,6 +60,8 @@ export class Enemy {
   splitInto: SplitSpec | null;
   // 병사와 교전 중 이동 정지(M10). melee 시스템이 매 프레임 재판정한다.
   blocked = false;
+  // 이번 프레임 rough 지형 위에서 감속 중인가(D7.1) — update가 갱신, 텔레메트리·실측이 읽는다.
+  onRough = false;
   // 근접 반격 쿨다운(초). melee 시스템이 감소·갱신한다(combat의 tower.cooldown과 동일 패턴).
   meleeCooldown = 0;
   // 칸 중심 기준 픽셀 좌표.
@@ -131,7 +136,7 @@ export class Enemy {
     }
   }
 
-  update(dt: number, field: FlowField): void {
+  update(dt: number, field: FlowField, grid: Grid): void {
     if (this.reachedBase || this.dead) return;
 
     // 재생(D4.1) — dt 기반 HP 회복(maxHp 상한). 블록·슬로우와 독립적으로 매 프레임 적용.
@@ -144,7 +149,10 @@ export class Enemy {
       this.slowTimer -= dt;
       if (this.slowTimer <= 0) this.slowTimer = 0;
     }
-    const speedMult = this.slowTimer > 0 ? 1 - this.slowFactor : 1;
+    // 슬로우(프로스트)와 rough 지형은 곱연산으로 함께 적용된다(둘 다 이속에만).
+    let speedMult = this.slowTimer > 0 ? 1 - this.slowFactor : 1;
+    this.onRough = grid.isRough(this.cx, this.cy); // 현재 점유 칸이 rough면 감속.
+    if (this.onRough) speedMult *= ROUGH_FACTOR;
 
     // 병사에게 블로킹당하면 이번 프레임 이동만 정지(슬로우 타이머는 위에서 이미 갱신).
     if (this.blocked) return;

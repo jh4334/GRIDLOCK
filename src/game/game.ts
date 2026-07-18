@@ -24,6 +24,8 @@ import { Controls } from '../ui/controls';
 import { WaveManager } from './waves';
 import { DebugCheats } from '../debug/cheats';
 import { publishStressTelemetry } from '../debug/stressTelemetry';
+import { publishTerrainTelemetry } from '../debug/terrainTelemetry';
+import type { MapTerrain } from './maps';
 import { Interaction } from './interaction';
 import { UnitSelection } from './unitSelection';
 import { bindGameInput } from './gameInput';
@@ -184,9 +186,9 @@ export class Game {
   get best(): BestRecord | null { return this.flow.best; } // 최고기록(타이틀 표시) — App이 읽는다.
   get endlessBest(): number { return this.flow.endlessBest; } // 엔드리스 최고 웨이브(타이틀 표시, D4.3).
 
-  /** 정복→디펜스 진입 — 선택 맵 바위 주입 + 월드 초기화 + 시작. 재시작은 resetWorld가 같은 맵 유지(D4.4). */
-  activate(rocks: [number, number][]): void {
-    this.grid.setMap(rocks);
+  /** 정복→디펜스 진입 — 선택 맵 지형 주입 + 월드 초기화 + 시작. 재시작은 resetWorld가 같은 맵 유지(D4.4→D7.1). */
+  activate(terrain: MapTerrain): void {
+    this.grid.setMap(terrain);
     this.flow.startGame();
     this.active = true;
   }
@@ -221,8 +223,7 @@ export class Game {
 
   private setSpeed(s: number): void { this.speed = s; this.controls.setActiveSpeed(s); }
 
-  // ── update / render ─────────────────────────────────────────
-  // FPS·입력·플래시는 프레임당 1회, 월드 갱신은 배속만큼 반복(App이 디펜스 활성 프레임에만 호출).
+  // ── update / render ── FPS·입력·플래시는 프레임당 1회, 월드 갱신은 배속만큼 반복(디펜스 활성 프레임만).
   update(dt: number): void {
     this.audio.resetFrame(); // 프레임당 발사/명중음 스로틀 카운터 리셋.
     this.fps.update(dt);
@@ -234,12 +235,11 @@ export class Game {
     this.vignette.update(dt); // 기지 피격 비네트도 실시간 페이드(연출 — 배속 무관).
 
     // 게임 월드는 playing 상태에서만, 배속 수만큼 서브스텝으로 갱신.
-    if (this.flow.state === 'playing') {
-      for (let i = 0; i < this.speed; i++) this.updateWorld(dt);
-    }
+    if (this.flow.state === 'playing') for (let i = 0; i < this.speed; i++) this.updateWorld(dt);
 
     this.syncUi();
     publishStressTelemetry(this.enemies.length, this.flow.state === 'playing'); // D5.1 스트레스 하네스(읽기 전용).
+    publishTerrainTelemetry(this.enemies.reduce((n, e) => n + (e.onRough ? 1 : 0), 0)); // D7.1 rough 감속 실측(읽기 전용).
   }
 
   // 게임 월드 1스텝(적·전투·라이프·필터·웨이브·승패). 배속 시 이 함수만 반복된다.
@@ -249,7 +249,7 @@ export class Game {
 
     // 근접 전투는 적 이동보다 먼저 — 블로킹(enemy.blocked)을 세운 뒤 적 update가 이동을 건너뛴다.
     this.melee.update(dt, this.interaction.barracks, this.enemies, this.economy);
-    for (const e of this.enemies) e.update(dt, this.flowField);
+    for (const e of this.enemies) e.update(dt, this.flowField, this.grid);
     // 전투(타겟팅·발사·명중·데미지·처치 골드)는 combat 시스템이 담당.
     this.combat.update(dt, this.interaction.towers, this.enemies, this.economy, this.flowField);
     for (const e of this.enemies) if (e.reachedBase) { this.economy.loseLife(1); this.vignette.trigger(); }

@@ -1,16 +1,37 @@
-// 디펜스 맵 정의 접근기(D4.4) — 밸런스/지형 데이터는 src/data/maps.json이 소유하고,
-// 여기서는 맵 id로 바위 좌표·이름을 읽어 주는 얇은 래퍼만 둔다(코드에 매직넘버 금지).
+// 디펜스 맵 정의 접근기(D4.4→D7.1) — 밸런스/지형 데이터는 src/data/maps.json이 소유하고,
+// 여기서는 맵 id로 지형 좌표·이름을 읽어 주는 얇은 래퍼만 둔다(코드에 매직넘버 금지).
 //
-// 바위(rock) 칸은 건설·통행·판매 불가. Grid.setMap에 좌표 배열을 주입하면 정적 레이어에
-// 그려지고 isWalkable/isCellPlaceable이 벽으로 취급한다. 최고기록은 맵 구분 없이 공용.
+// 지형 3종(D7.1):
+//   rock  — 통행×·건설× (isWalkable false)
+//   water — 통행×·건설× (isWalkable false, 시각만 물 타일로 구분)
+//   rough — 통행○·건설○이되 적 이속 roughSpeedFactor 배(전략 지형)
+// Grid.setMap에 지형을 주입하면 정적 레이어에 그려지고, isWalkable/isCellPlaceable이
+// rock·water는 벽으로, rough는 통행·설치 가능한 감속 지형으로 취급한다.
 
 import mapsData from '../data/maps.json';
 import type { MapId } from '../core/storage';
 
-// [cx, cy] 쌍의 배열. maps.json의 rocks 필드와 1:1.
-export type RockCell = [number, number];
+// [cx, cy] 쌍. maps.json terrain.{rock,water,rough} 각 항목과 1:1.
+export type TerrainCell = [number, number];
 
-/** 맵 id의 바위 좌표 배열. 미정의 id면 빈 배열(안전 폴백). */
-export function mapRocks(id: MapId): RockCell[] {
-  return (mapsData.maps[id]?.rocks ?? []) as RockCell[];
+// 한 맵의 지형 3종 좌표 묶음(정적, 게임 중 불변).
+export interface MapTerrain {
+  rock: TerrainCell[];
+  water: TerrainCell[];
+  rough: TerrainCell[];
+}
+
+/** 맵 id의 지형 좌표 묶음. 미정의 id·필드면 빈 배열(안전 폴백). */
+export function mapTerrain(id: MapId): MapTerrain {
+  const t = mapsData.maps[id]?.terrain;
+  return {
+    rock: (t?.rock ?? []) as TerrainCell[],
+    water: (t?.water ?? []) as TerrainCell[],
+    rough: (t?.rough ?? []) as TerrainCell[],
+  };
+}
+
+/** rough 칸 위 적 이속 배율(밸런스 수치, maps.json 최상위). 프로스트 슬로우와 곱연산. */
+export function roughSpeedFactor(): number {
+  return mapsData.roughSpeedFactor;
 }
