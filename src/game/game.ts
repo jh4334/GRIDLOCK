@@ -24,6 +24,7 @@ import { WaveManager } from './waves';
 import { DebugCheats } from '../debug/cheats';
 import { publishStressTelemetry } from '../debug/stressTelemetry';
 import { publishTerrainTelemetry } from '../debug/terrainTelemetry';
+import { publishBalanceTelemetry } from '../debug/balanceProbe';
 import type { MapTerrain } from './maps';
 import { Interaction } from './interaction';
 import { UnitSelection } from './unitSelection';
@@ -244,6 +245,11 @@ export class Game {
     this.syncUi();
     publishStressTelemetry(this.enemies.length, this.flow.state === 'playing'); // D5.1 스트레스 하네스(읽기 전용).
     publishTerrainTelemetry(this.enemies.reduce((n, e) => n + (e.onRough ? 1 : 0), 0), this.roadCells); // rough 감속 + 도로 경로(읽기 전용).
+    publishBalanceTelemetry({ // D7.7 밸런스 측정 봇용(읽기 전용) — 골드/라이프/웨이브/상태.
+      gold: this.economy.gold, lives: this.economy.lives, wave: this.waveManager.current,
+      state: this.flow.state, inProgress: this.waveManager.inProgress,
+      canStart: this.waveManager.canStart, endless: this.waveManager.isEndless,
+    });
   }
 
   // 게임 월드 1스텝(적·전투·라이프·필터·웨이브·승패). 배속 시 이 함수만 반복된다.

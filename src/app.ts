@@ -15,6 +15,7 @@ import { mapTerrain, mapSpawns } from './game/maps';
 import { generateMap, todaySeed, randomSeed } from './game/mapGen';
 import { renderTitle, hitTitleButton, hitDifficultyButton, hitDefenseCard, hitConquestCard } from './ui/title';
 import { tickClock } from './render/sprites';
+import { exposeSeedPlay } from './debug/balanceProbe';
 
 type Mode = 'title' | 'defense' | 'conquest';
 
@@ -69,6 +70,14 @@ export class App {
       const hit = hitTitleButton(canvas.width, canvas.height, x, y);
       if (hit === 'defense') this.enterDefense();
       else if (hit === 'conquest') this.enterConquest();
+    });
+
+    // D7.7 밸런스 측정 — 고정 시드 랜덤맵 디펜스 강제 진입(측정 봇 전용). 타이틀엔 시드 강제 경로가
+    // 없어 debug로만 노출한다. enterDefense의 랜덤 분기와 동일하되 시드만 외부에서 고정한다.
+    exposeSeedPlay((seed) => {
+      this.mode = 'defense';
+      const g = generateMap(seed);
+      this.game.activate(g.terrain, g.spawns, { seed, mode: 'random' });
     });
   }
 
