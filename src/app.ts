@@ -8,10 +8,11 @@
 import { GameLoop } from './core/loop';
 import { MouseInput } from './core/input';
 import { AudioEngine } from './core/audio';
-import { loadAudio, saveAudio, loadDifficulty, saveDifficulty, loadMapId, saveMapId, loadConquestMap, saveConquestMap, type DifficultyId, type MapId, type ConquestMapId } from './core/storage';
+import { loadAudio, saveAudio, loadDifficulty, saveDifficulty, loadMapId, saveMapId, loadConquestMap, saveConquestMap, loadDaily, type DifficultyId, type MapId, type ConquestMapId } from './core/storage';
 import { Game } from './game/game';
 import { ConquestGame } from './conquest/conquestGame';
 import { mapTerrain, mapSpawns } from './game/maps';
+import { generateMap, todaySeed, randomSeed } from './game/mapGen';
 import { renderTitle, hitTitleButton, hitDifficultyButton, hitMapButton, hitConquestMapButton } from './ui/title';
 import { tickClock } from './render/sprites';
 
@@ -77,7 +78,15 @@ export class App {
 
   private enterDefense(): void {
     this.mode = 'defense';
-    this.game.activate(mapTerrain(this.mapId), mapSpawns(this.mapId)); // 선택 맵의 지형·스폰을 주입해 진입(재시작은 같은 맵 유지, D7.3).
+    // 랜덤·오늘의 맵은 시드로 절차 생성한다(D7.5). 랜덤=진입 시 새 시드, 오늘의 맵=날짜 시드(하루 동일).
+    // 시드는 activate 시점에 Game에 고정되어, 재시작해도 같은 맵을 유지한다.
+    if (this.mapId === 'random' || this.mapId === 'daily') {
+      const seed = this.mapId === 'daily' ? todaySeed() : randomSeed();
+      const g = generateMap(seed);
+      this.game.activate(g.terrain, g.spawns, { seed, mode: this.mapId });
+    } else {
+      this.game.activate(mapTerrain(this.mapId), mapSpawns(this.mapId)); // 고정 맵의 지형·스폰을 주입해 진입(재시작은 같은 맵 유지, D7.3).
+    }
   }
 
   private enterConquest(): void {
@@ -101,6 +110,6 @@ export class App {
   private render(): void {
     if (this.mode === 'defense') this.game.render();
     else if (this.mode === 'conquest') this.conquest.render();
-    else renderTitle(this.ctx, this.game.best, this.difficulty, this.mapId, this.conquestMap, this.game.endlessBest); // 타이틀(최고기록 + 난이도 + 디펜스/정복 맵).
+    else renderTitle(this.ctx, this.game.best, this.difficulty, this.mapId, this.conquestMap, this.game.endlessBest, loadDaily(), todaySeed()); // 타이틀(최고기록 + 난이도 + 디펜스/정복 맵 + 오늘의 맵 기록).
   }
 }

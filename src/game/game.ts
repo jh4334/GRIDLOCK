@@ -75,6 +75,7 @@ export class Game {
   private showHitbox = false; // H 치트로 토글하는 히트박스 오버레이.
   private lastGold: number; // 골드 변동 감지용(변할 때만 메뉴 갱신).
   private active = false; // App이 디펜스 모드를 활성화했을 때만 입력·update 처리.
+  private currentSeed: number | null = null; // 랜덤·오늘의 맵이면 활성화 시 고정한 시드(HUD 표기, D7.5).
 
   constructor(
     canvas: HTMLCanvasElement,
@@ -103,8 +104,7 @@ export class Game {
       onWaveClear: (_wave, bonus) => this.awardBonus(bonus), // 클리어·얼리콜은 동일 피드백(골드+사운드).
       onEarlyCall: (bonus) => this.awardBonus(bonus),
       onVictory: () => { this.flow.win(); this.audio.win(); },
-      // 시작/완료/리셋 시점에만 다음 웨이브 구성을 프리뷰에 반영(매 프레임 아님).
-      onWaveChange: () => this.controls.setWavePreview(this.waveManager.nextWaveComposition()),
+      onWaveChange: () => this.controls.setWavePreview(this.waveManager.nextWaveComposition()), // 시작/완료/리셋 시점에만 프리뷰 갱신(매 프레임 아님).
     });
 
     this.controls = new Controls({
@@ -187,9 +187,13 @@ export class Game {
   get best(): BestRecord | null { return this.flow.best; } // 최고기록(타이틀 표시) — App이 읽는다.
   get endlessBest(): number { return this.flow.endlessBest; } // 엔드리스 최고 웨이브(타이틀 표시, D4.3).
 
-  /** 정복→디펜스 진입 — 선택 맵 지형·스폰 주입 + 월드 초기화 + 시작. 재시작은 resetWorld가 같은 맵 유지(D4.4→D7.1→D7.3). */
-  activate(terrain: MapTerrain, spawns: Cell[]): void {
+  // 디펜스 진입 — 맵 지형·스폰 주입 + 월드 초기화 + 시작(재시작은 resetWorld가 같은 맵 유지, D4.4→D7.3).
+  // 랜덤·오늘의 맵은 opts로 시드를 받아 활성화 시점에 고정하고(재시작해도 동일 시드), 오늘의 맵이면
+  // 시드를 flow에 넘겨 승/패 시 시드별 최고기록을 갱신하게 한다(랜덤은 기록 안 함, D7.5).
+  activate(terrain: MapTerrain, spawns: Cell[], opts?: { seed?: number; mode?: 'random' | 'daily' }): void {
     this.grid.setMap(terrain, spawns);
+    this.currentSeed = opts?.seed ?? null;
+    this.flow.setDailySeed(opts?.mode === 'daily' ? this.currentSeed : null);
     this.spawnControl.reset(); // 새 맵 진입 시 라운드로빈 순번 초기화(startGame→recomputeField가 도로 갱신).
     this.flow.startGame();
     this.active = true;
@@ -286,15 +290,11 @@ export class Game {
 
   render(): void {
     renderDefense(this.ctx, {
-      canvas: this.canvas, shake: this.shake,
-      grid: this.grid, roadCells: this.roadCells,
+      canvas: this.canvas, shake: this.shake, grid: this.grid, roadCells: this.roadCells,
       showFlowDebug: this.showFlowDebug, flowField: this.flowField,
-      interaction: this.interaction, enemies: this.enemies,
-      unitSelection: this.unitSelection, combat: this.combat,
-      effects: this.effects, decals: this.decals, vignette: this.vignette,
-      showHitbox: this.showHitbox, hud: this.hud,
-      economy: this.economy, waveManager: this.waveManager,
-      flow: this.flow, fps: this.fps,
+      interaction: this.interaction, enemies: this.enemies, unitSelection: this.unitSelection, combat: this.combat,
+      effects: this.effects, decals: this.decals, vignette: this.vignette, showHitbox: this.showHitbox, hud: this.hud,
+      economy: this.economy, waveManager: this.waveManager, flow: this.flow, fps: this.fps, seed: this.currentSeed,
     });
   }
 }

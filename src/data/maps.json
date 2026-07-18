@@ -1,5 +1,14 @@
 {
   "roughSpeedFactor": 0.7,
+  "randomGen": {
+    "clearRadius": 2,
+    "maxRetries": 20,
+    "ridge": { "minCount": 1, "maxCount": 2, "colMin": 4, "colMax": 15, "gapMin": 2, "gapMax": 3 },
+    "rock": { "min": 6, "max": 12 },
+    "water": { "poolMax": 2, "sizeMin": 2, "sizeMax": 4 },
+    "rough": { "areaMin": 2, "areaMax": 3, "sizeMin": 2, "sizeMax": 6 },
+    "spawn": { "chance": 0.25, "topMin": 1, "topMax": 4, "botMin": 9, "botMax": 12 }
+  },
   "maps": {
     "classic": {
       "name": "평원",

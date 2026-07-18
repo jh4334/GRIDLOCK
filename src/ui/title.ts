@@ -2,7 +2,7 @@
 // 상태 변경 없는 순수 렌더. 버튼 클릭 판정(hit*)과 버튼 기하·렌더는 titleButtons.ts로 분리(D7.4).
 // 최고기록 문자열 포맷(formatBest)은 승/패 오버레이와 공유한다.
 
-import type { BestRecord, DifficultyId, MapId, ConquestMapId } from '../core/storage';
+import type { BestRecord, DailyRecord, DifficultyId, MapId, ConquestMapId } from '../core/storage';
 import { animTime } from '../render/sprites';
 import {
   titleButtons,
@@ -10,6 +10,7 @@ import {
   drawDifficultyButtons,
   drawMapButtons,
   drawConquestMapButtons,
+  drawDailyBest,
 } from './titleButtons';
 
 // hit*·TitleMode는 App이 클릭 판정에 쓰므로 titleButtons에서 재노출(호출부 import 경로 단일화).
@@ -40,6 +41,8 @@ export function renderTitle(
   mapId: MapId, // 선택된 디펜스 맵 — 버튼 하이라이트(D4.4→D7.2).
   conquestMap: ConquestMapId, // 선택된 정복 맵 — 버튼 하이라이트(D7.4).
   endlessBest = 0, // 엔드리스 최고 도달 웨이브(0이면 표시 안 함, D4.3).
+  daily: DailyRecord | null = null, // 오늘의 맵 최고기록(D7.5) — 시드가 오늘이면 맵 버튼 옆에 표시.
+  todaySeedVal = 0, // 오늘의 맵 시드(YYYYMMDD) — daily.seed와 일치할 때만 기록 표시.
 ): void {
   const w = ctx.canvas.width;
   const h = ctx.canvas.height;
@@ -73,6 +76,7 @@ export function renderTitle(
 
   // 하위 선택 버튼(현재 선택 하이라이트).
   drawMapButtons(ctx, w, h, mapId); // 디펜스 맵(디펜스 아래).
+  drawDailyBest(ctx, w, h, daily, todaySeedVal); // 오늘의 맵 최고기록(그 버튼 옆, D7.5).
   drawDifficultyButtons(ctx, w, h, difficulty); // 정복 난이도(정복 아래).
   drawConquestMapButtons(ctx, w, h, conquestMap); // 정복 맵(난이도 아래, D7.4).
 

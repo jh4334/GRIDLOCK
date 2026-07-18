@@ -25,9 +25,13 @@ export interface MapTerrain {
 // 스폰이 정의되지 않은 맵(대부분)의 기본 침입 지점 — 좌측 중앙 단일 스폰(D7.3).
 const DEFAULT_SPAWNS: TerrainCell[] = [[0, 7]];
 
-/** 맵 id의 지형 좌표 묶음. 미정의 id·필드면 빈 배열(안전 폴백). */
+// JSON 정의 맵만 담은 조회용 사전(random·daily 등 절차 생성 id는 여기 없다 → undefined 폴백).
+type FixedMap = { name: string; spawns?: number[][]; terrain?: { rock?: number[][]; water?: number[][]; rough?: number[][] } };
+const FIXED_MAPS = mapsData.maps as unknown as Record<string, FixedMap>;
+
+/** 맵 id의 지형 좌표 묶음. 미정의 id(절차 생성 포함)·필드면 빈 배열(안전 폴백). */
 export function mapTerrain(id: MapId): MapTerrain {
-  const t = mapsData.maps[id]?.terrain;
+  const t = FIXED_MAPS[id]?.terrain;
   return {
     rock: (t?.rock ?? []) as TerrainCell[],
     water: (t?.water ?? []) as TerrainCell[],
@@ -40,13 +44,18 @@ export function mapTerrain(id: MapId): MapTerrain {
  * 기지는 단일 유지(BASE 상수)라 여기선 다루지 않는다.
  */
 export function mapSpawns(id: MapId): Cell[] {
-  const raw = (mapsData.maps[id] as { spawns?: TerrainCell[] })?.spawns ?? DEFAULT_SPAWNS;
+  const raw = FIXED_MAPS[id]?.spawns ?? DEFAULT_SPAWNS;
   return raw.map(([cx, cy]) => ({ cx, cy }));
 }
 
-/** 전체 맵 목록(JSON 정의 순서). 타이틀 버튼을 데이터로 생성하는 데 쓴다(D7.2). */
+/**
+ * 전체 맵 목록(JSON 정의 순서). 타이틀 버튼을 데이터로 생성하는 데 쓴다(D7.2).
+ * 끝에 절차 생성 맵 2종(랜덤·오늘의 맵, D7.5)을 덧붙인다 — JSON에 없어 지형은 mapGen이 만든다.
+ */
 export function mapList(): { id: MapId; name: string }[] {
-  return (Object.keys(mapsData.maps) as MapId[]).map((id) => ({ id, name: mapsData.maps[id].name }));
+  const keys = Object.keys(mapsData.maps) as (keyof typeof mapsData.maps)[];
+  const fixed = keys.map((id) => ({ id: id as MapId, name: mapsData.maps[id].name }));
+  return [...fixed, { id: 'random' as MapId, name: '랜덤' }, { id: 'daily' as MapId, name: '오늘의 맵' }];
 }
 
 /** rough 칸 위 적 이속 배율(밸런스 수치, maps.json 최상위). 프로스트 슬로우와 곱연산. */

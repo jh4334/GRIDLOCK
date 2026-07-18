@@ -7,7 +7,7 @@
 //   디펜스 맵 버튼(디펜스 아래, 여러 줄) — mapButtons/drawMapButtons (디펜스 네온)
 //   정복 맵 버튼(난이도 아래) — conquestMapButtons/drawConquestMapButtons (정복 네온, D7.4)
 
-import { conquestMapList, type DifficultyId, type MapId, type ConquestMapId } from '../core/storage';
+import { conquestMapList, type DailyRecord, type DifficultyId, type MapId, type ConquestMapId } from '../core/storage';
 import { mapList } from '../game/maps';
 
 export type TitleMode = 'defense' | 'conquest';
@@ -184,6 +184,32 @@ export function drawDifficultyButtons(ctx: CanvasRenderingContext2D, w: number, 
 export function drawMapButtons(ctx: CanvasRenderingContext2D, w: number, h: number, current: MapId): void {
   const btns = mapButtons(w, h).map((b) => ({ label: b.label, rect: b.rect, selected: b.id === current }));
   drawSelectableRow(ctx, btns, COLOR_NEON_DEFENSE, 'rgba(20, 44, 56, 0.9)', '#d7f4ff', '맵', 14);
+}
+
+/**
+ * 오늘의 맵 최고기록 표시(D7.5) — 저장 기록의 시드가 오늘 시드와 같을 때만, '오늘의 맵' 버튼
+ * 오른쪽 빈 슬롯(맵 그리드 3열 중 마지막 줄의 남는 칸)에 소형으로 그린다. 시드가 다르면(지난 날) 숨김.
+ */
+export function drawDailyBest(
+  ctx: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  record: DailyRecord | null,
+  todaySeedVal: number,
+): void {
+  if (!record || record.seed !== todaySeedVal) return;
+  const daily = mapButtons(w, h).find((b) => b.id === 'daily');
+  if (!daily) return;
+
+  const x = daily.rect.x + daily.rect.w + MBTN_GAP; // 버튼 오른쪽 빈 슬롯.
+  const y = daily.rect.y + daily.rect.h / 2;
+  ctx.save();
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.font = 'bold 12px monospace';
+  ctx.fillStyle = COLOR_NEON_DEFENSE;
+  ctx.fillText(`최고 W${record.wave}${record.cleared ? ' ✓' : ''}`, x, y);
+  ctx.restore();
 }
 
 /** 정복 맵 버튼 렌더(현재 선택 강조, 정복 네온, D7.4). */

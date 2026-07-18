@@ -43,6 +43,7 @@ export interface DefenseRenderParts {
   waveManager: WaveManager;
   flow: GameFlow;
   fps: FpsCounter;
+  seed: number | null; // 랜덤·오늘의 맵이면 HUD에 표기할 시드(D7.5), 아니면 null.
 }
 
 export function renderDefense(ctx: CanvasRenderingContext2D, p: DefenseRenderParts): void {
@@ -70,7 +71,7 @@ export function renderDefense(ctx: CanvasRenderingContext2D, p: DefenseRenderPar
 
   if (p.showHitbox) renderHitboxes(ctx, p.enemies, p.interaction.towers); // H 치트.
 
-  p.hud.render(ctx, p.economy, { current: p.waveManager.current, total: p.waveManager.total, endless: p.waveManager.isEndless });
+  p.hud.render(ctx, p.economy, { current: p.waveManager.current, total: p.waveManager.total, endless: p.waveManager.isEndless }, p.seed);
   p.interaction.renderToast(ctx); // 설치 불가 사유 토스트는 HUD 위, 오버레이 아래(D2.1).
   // 승리/패배 오버레이는 HUD 위, FPS 아래로 그린다.
   renderOverlay(ctx, p.flow.state, p.waveManager.current, p.waveManager.total, p.flow.best, p.waveManager.isEndless);
