@@ -16,7 +16,7 @@ import { spawnUnitsFor, maintainRoster } from './roster';
 import { ConquestCombat } from './conquestCombat';
 import { commandUnits as runCommandUnits, commandWorkers as runCommandWorkers } from './conquestCommands';
 import { EnemyAI, type DifficultySettings } from './enemyAI';
-import type { DifficultyId } from '../core/storage';
+import type { DifficultyId, ConquestMapId } from '../core/storage';
 
 const C = conquestData;
 
@@ -48,16 +48,23 @@ export class ConquestWorld {
   private depotsBuilt = 0;
 
   // difficulty(D3.3): 적 진영에만 적용(공격 주기·빌드오더·시작 자원). 플레이어 시작 자원은 공통 150.
-  constructor(private audio?: WorldAudio, difficulty: DifficultyId = 'normal') {
-    this.playerHQ = new HQ('player', C.hq.playerCell[0], C.hq.playerCell[1], C.hq.hp, C.hq.workerBuildTime, C.hq.queueMax);
-    this.enemyHQ = new HQ('enemy', C.hq.enemyCell[0], C.hq.enemyCell[1], C.hq.hp, C.hq.workerBuildTime, C.hq.queueMax);
+  // mapId(D7.4): 맵별 본진·크리스탈·바위 지형·적 레이아웃 좌표를 conquest.json maps에서 골라 배치.
+  constructor(private audio?: WorldAudio, difficulty: DifficultyId = 'normal', mapId: ConquestMapId = 'standard') {
+    const map = C.maps[mapId];
+    // 맵 지형 바위(통행·건설 불가)를 먼저 세운다 — HQ·크리스탈보다 앞서 정적 레이어에 굽는다.
+    // terrain은 선택 필드(맵별 유무가 달라 유니온에서 사라지므로 좁은 캐스트로 읽는다).
+    const rock = (map as { terrain?: { rock: number[][] } }).terrain?.rock ?? [];
+    this.grid.setRocks(rock as [number, number][]);
+
+    this.playerHQ = new HQ('player', map.hq.player[0], map.hq.player[1], C.hq.hp, C.hq.workerBuildTime, C.hq.queueMax);
+    this.enemyHQ = new HQ('enemy', map.hq.enemy[0], map.hq.enemy[1], C.hq.hp, C.hq.workerBuildTime, C.hq.queueMax);
     this.grid.setState(this.playerHQ.cx, this.playerHQ.cy, 'wall');
     this.grid.setState(this.enemyHQ.cx, this.enemyHQ.cy, 'wall');
 
-    // 매장량 차등(D3.2): 본진 필드는 소량(home), 중앙 2칸은 대량(center) — 확장 유도.
+    // 매장량 차등(D3.2): 본진 필드는 소량(home), 중앙 칸은 대량(center) — 확장 유도.
     const add = (cx: number, cy: number, amt: number): void => { this.crystals.push(new Crystal(cx, cy, amt)); this.grid.setState(cx, cy, 'crystal'); };
-    for (const [cx, cy] of [...C.crystal.playerCells, ...C.crystal.enemyCells]) add(cx, cy, C.crystal.amount.home);
-    for (const [cx, cy] of C.crystal.centerCells) add(cx, cy, C.crystal.amount.center);
+    for (const [cx, cy] of [...map.crystals.player, ...map.crystals.enemy]) add(cx, cy, C.crystal.amount.home);
+    for (const [cx, cy] of map.crystals.center) add(cx, cy, C.crystal.amount.center);
 
     this.combat = new ConquestCombat({
       onUnitKilled: (x, y, color, side) => {
@@ -83,6 +90,7 @@ export class ConquestWorld {
       buildings: this.buildings,
       units: this.units,
       difficulty: diff,
+      layout: map.enemyLayout as Record<BuildKind, number[][]>,
       onBuildComplete: (b) => this.onBuildComplete(b),
       onWaveLaunch: () => this.audio?.alarm(), // 적 웨이브 출발 시 경보음.
     });

@@ -28,10 +28,18 @@ export interface AudioSettings {
 }
 
 import mapsData from '../data/maps.json';
+import conquestData from '../data/conquest.json';
 
 export type DifficultyId = 'easy' | 'normal' | 'hard';
 // 디펜스 맵 id — maps.json의 키 목록에서 파생(데이터 주도, D7.2). 맵 추가 시 JSON만 고치면 된다.
 export type MapId = keyof typeof mapsData.maps;
+// 정복 맵 id — conquest.json maps 키에서 파생(데이터 주도, D7.4).
+export type ConquestMapId = keyof typeof conquestData.maps;
+
+/** 정복 맵 목록(정의 순서, id·이름) — 타이틀 버튼을 데이터로 생성. */
+export function conquestMapList(): { id: ConquestMapId; name: string }[] {
+  return (Object.keys(conquestData.maps) as ConquestMapId[]).map((id) => ({ id, name: conquestData.maps[id].name }));
+}
 
 /** 통합 저장 객체(v2). null/기본값은 "해당 항목 미기록"을 뜻한다. */
 export interface SaveData {
@@ -41,6 +49,7 @@ export interface SaveData {
   audio: AudioSettings | null;
   difficulty: DifficultyId;
   map: MapId;
+  conquestMap: ConquestMapId;
 }
 
 const SAVE_KEY = 'gridlock.save';
@@ -56,7 +65,7 @@ const LEGACY_KEYS = {
 } as const;
 
 function defaults(): SaveData {
-  return { v: SCHEMA_VERSION, best: null, endlessBest: 0, audio: null, difficulty: 'normal', map: 'classic' };
+  return { v: SCHEMA_VERSION, best: null, endlessBest: 0, audio: null, difficulty: 'normal', map: 'classic', conquestMap: 'standard' };
 }
 
 // ── 필드 정규화(손상 값은 기본값으로) ─────────────────────────────
@@ -102,6 +111,12 @@ function coerceMap(x: unknown): MapId {
     : 'classic';
 }
 
+function coerceConquestMap(x: unknown): ConquestMapId {
+  return typeof x === 'string' && Object.prototype.hasOwnProperty.call(conquestData.maps, x)
+    ? (x as ConquestMapId)
+    : 'standard';
+}
+
 /** 파싱된 임의 값 → 정상 SaveData(필드별로 정규화, 손상 필드는 기본값). */
 function normalize(parsed: unknown): SaveData {
   const o = (typeof parsed === 'object' && parsed !== null ? parsed : {}) as Record<string, unknown>;
@@ -112,6 +127,7 @@ function normalize(parsed: unknown): SaveData {
     audio: coerceAudio(o.audio),
     difficulty: coerceDifficulty(o.difficulty),
     map: coerceMap(o.map),
+    conquestMap: coerceConquestMap(o.conquestMap),
   };
 }
 
@@ -269,4 +285,15 @@ export function loadMapId(): MapId {
 /** 디펜스 맵 저장. 예외(프라이빗 모드 등)는 조용히 무시. */
 export function saveMapId(id: MapId): void {
   patchSave({ map: id });
+}
+
+// ── 정복 맵 선택(D7.4) ────────────────────────────────────────────
+/** 저장된 정복 맵을 읽는다. 없거나 손상/예외면 'standard'. */
+export function loadConquestMap(): ConquestMapId {
+  return readSave().conquestMap;
+}
+
+/** 정복 맵 저장. 예외(프라이빗 모드 등)는 조용히 무시. */
+export function saveConquestMap(id: ConquestMapId): void {
+  patchSave({ conquestMap: id });
 }

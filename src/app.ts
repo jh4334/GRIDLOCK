@@ -8,11 +8,11 @@
 import { GameLoop } from './core/loop';
 import { MouseInput } from './core/input';
 import { AudioEngine } from './core/audio';
-import { loadAudio, saveAudio, loadDifficulty, saveDifficulty, loadMapId, saveMapId, type DifficultyId, type MapId } from './core/storage';
+import { loadAudio, saveAudio, loadDifficulty, saveDifficulty, loadMapId, saveMapId, loadConquestMap, saveConquestMap, type DifficultyId, type MapId, type ConquestMapId } from './core/storage';
 import { Game } from './game/game';
 import { ConquestGame } from './conquest/conquestGame';
 import { mapTerrain, mapSpawns } from './game/maps';
-import { renderTitle, hitTitleButton, hitDifficultyButton, hitMapButton } from './ui/title';
+import { renderTitle, hitTitleButton, hitDifficultyButton, hitMapButton, hitConquestMapButton } from './ui/title';
 import { tickClock } from './render/sprites';
 
 type Mode = 'title' | 'defense' | 'conquest';
@@ -26,6 +26,7 @@ export class App {
   private mode: Mode = 'title';
   private difficulty: DifficultyId = loadDifficulty(); // 정복 난이도(타이틀에서 선택, 하이라이트·저장).
   private mapId: MapId = loadMapId(); // 디펜스 맵(평원/협곡) — 타이틀에서 선택, 진입 시 적용(D4.4).
+  private conquestMap: ConquestMapId = loadConquestMap(); // 정복 맵(표준/능선/사분면) — 타이틀에서 선택, 진입 시 적용(D7.4).
 
   constructor(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D) {
     this.ctx = ctx;
@@ -56,6 +57,12 @@ export class App {
       if (map) {
         this.mapId = map;
         saveMapId(map);
+        return;
+      }
+      const cmap = hitConquestMapButton(canvas.width, canvas.height, x, y);
+      if (cmap) {
+        this.conquestMap = cmap;
+        saveConquestMap(cmap);
         return;
       }
       const hit = hitTitleButton(canvas.width, canvas.height, x, y);
@@ -94,6 +101,6 @@ export class App {
   private render(): void {
     if (this.mode === 'defense') this.game.render();
     else if (this.mode === 'conquest') this.conquest.render();
-    else renderTitle(this.ctx, this.game.best, this.difficulty, this.mapId, this.game.endlessBest); // 타이틀(최고기록 + 난이도 + 맵).
+    else renderTitle(this.ctx, this.game.best, this.difficulty, this.mapId, this.conquestMap, this.game.endlessBest); // 타이틀(최고기록 + 난이도 + 디펜스/정복 맵).
   }
 }

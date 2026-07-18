@@ -5,12 +5,14 @@
 // A*는 systems/astar의 PathGrid 인터페이스로 이 클래스를 받는다(구조적 계약).
 // 정적 레이어(바닥+격자)만 프리렌더하고, 크리스탈·본진·건물은 동적 엔티티가 직접 그린다.
 
-import { COLS, ROWS, TILE, cellToPixel } from '../game/grid';
-import { paintGroundFloor } from '../render/tileSprites';
+import { COLS, ROWS, TILE, cellToPixel, cellCenter } from '../game/grid';
+import { paintGroundFloor, drawRock } from '../render/tileSprites';
 import { onAssetsReady } from '../render/sprites';
 import type { PathGrid } from '../systems/astar';
 
-export type ConquestCell = 'empty' | 'crystal' | 'wall';
+// 셀 종류(D7.4에서 rock 추가) — empty(통행) / crystal(채집지·통행×) / wall(본진·건물·통행×) /
+// rock(맵 지형 장애물·통행×·건설×). isWalkable은 empty만 참이라 rock은 자동으로 벽처럼 막힌다.
+export type ConquestCell = 'empty' | 'crystal' | 'wall' | 'rock';
 
 export class ConquestGrid implements PathGrid {
   readonly cols = COLS;
@@ -18,6 +20,8 @@ export class ConquestGrid implements PathGrid {
 
   private cells: ConquestCell[];
   private staticLayer: HTMLCanvasElement;
+  // 맵 지형 바위 좌표(정적, D7.4). setRocks가 주입하고 정적 레이어·미니맵이 읽는다.
+  private rockCells: [number, number][] = [];
 
   constructor() {
     this.cells = new Array(COLS * ROWS).fill('empty');
@@ -26,6 +30,18 @@ export class ConquestGrid implements PathGrid {
     onAssetsReady(() => {
       this.staticLayer = this.buildStaticLayer();
     });
+  }
+
+  /** 맵 바위 지형 주입(D7.4) — 칸을 rock으로 세우고 정적 레이어에 바위를 구워 둔다(통행·건설 불가). */
+  setRocks(cells: readonly [number, number][]): void {
+    this.rockCells = cells.map(([cx, cy]) => [cx, cy]);
+    for (const [cx, cy] of this.rockCells) this.setState(cx, cy, 'rock');
+    this.staticLayer = this.buildStaticLayer();
+  }
+
+  /** 바위 좌표 목록(미니맵 표시용, 읽기 전용 스냅샷). */
+  get rocks(): { cx: number; cy: number }[] {
+    return this.rockCells.map(([cx, cy]) => ({ cx, cy }));
   }
 
   private index(cx: number, cy: number): number {
@@ -64,6 +80,11 @@ export class ConquestGrid implements PathGrid {
     if (!c) throw new Error('오프스크린 Canvas 2D context를 얻을 수 없습니다.');
 
     paintGroundFloor(c, COLS, ROWS, 'sand');
+    // 맵 지형 바위(D7.4)를 바닥 위에 함께 구워 둔다 — 게임 중 불변이라 매 프레임 그릴 필요 없음.
+    for (const [cx, cy] of this.rockCells) {
+      const { x, y } = cellCenter(cx, cy);
+      drawRock(c, x, y);
+    }
     return layer;
   }
 
