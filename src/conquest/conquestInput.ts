@@ -3,6 +3,11 @@
 //
 // 좌클릭 우선순위: 공격 이동 모드 > 건설 모드 > 선택. 우클릭: 모드 취소 또는 이동/공격/채집 명령.
 // 키: A=공격 이동, Esc=취소, Ctrl+1~9=부대 지정, 1~9=부대 선택. active 가드로 디펜스와 격리한다.
+//
+// D8.5 터치(pointerType==='touch') 분기 — 롱프레스 contextmenu가 막혀 있어 우클릭 명령을 낼 수
+// 없으므로, 탭 하나가 선택과 명령을 겸한다: 탭 지점에 아군(유닛/일꾼/HQ)이 있으면 선택,
+// 없고 선택 중인 아군이 있으면 그 지점으로 이동/공격/채집 명령(우클릭과 같은 경로),
+// 둘 다 아니면 선택 해제. 마우스는 이 분기를 타지 않아 기존 UX가 그대로다.
 
 import type { MouseInput, Keyboard } from '../core/input';
 import type { ConquestWorld } from './conquestWorld';
@@ -20,7 +25,7 @@ export interface ConquestInputDeps {
   canInteract: () => boolean; // active + playing.
   getPlaceKind: () => BuildKind | null;
   cancelPlace: () => void; // 건설 모드 해제(placeKind + 메뉴 하이라이트).
-  tryPlace: (x: number, y: number) => void;
+  tryPlace: (x: number, y: number, touch: boolean) => void; // touch=true면 2탭 확정(D8.5).
   isAttackMove: () => boolean;
   setAttackMove: (v: boolean) => void;
   toggleMute: () => void; // M키 음소거 토글(active 시에만).
@@ -30,15 +35,34 @@ export interface ConquestInputDeps {
 export function bindConquestInput(d: ConquestInputDeps): void {
   const { input, keyboard, selection, groups } = d;
 
+  // 선택 중인 아군에게 그 지점 명령(우클릭 = 터치 탭 공통 경로).
+  const commandAt = (x: number, y: number): void => {
+    const w = d.getWorld();
+    if (selection.hasUnits) w.commandUnits(selection.selectedUnits, x, y);
+    if (selection.hasWorkers) w.commandWorkers(selection.selectedWorkers, x, y);
+  };
+
   input.onClick((x, y) => {
     if (!d.canInteract()) return;
+    const touch = input.pointerType === 'touch';
     if (d.isAttackMove()) {
       if (selection.hasUnits) d.getWorld().commandUnits(selection.selectedUnits, x, y, true);
       d.setAttackMove(false);
       return;
     }
-    if (d.getPlaceKind()) d.tryPlace(x, y);
-    else selection.clickSelect(x, y, d.getWorld().playerUnits, d.getWorld().workers, d.getWorld().playerHQ);
+    if (d.getPlaceKind()) {
+      d.tryPlace(x, y, touch);
+      return;
+    }
+    const w = d.getWorld();
+    // 터치 전용: 아군이 없는 지점 탭은 우클릭 대체(명령). 선택은 명령 후에도 유지된다.
+    if (touch && (selection.hasUnits || selection.hasWorkers)) {
+      if (selection.hitTest(x, y, w.playerUnits, w.workers, w.playerHQ) === 'none') {
+        commandAt(x, y);
+        return;
+      }
+    }
+    selection.clickSelect(x, y, w.playerUnits, w.workers, w.playerHQ);
   });
 
   input.onRightClick((x, y) => {
@@ -51,9 +75,7 @@ export function bindConquestInput(d: ConquestInputDeps): void {
       d.cancelPlace();
       return;
     }
-    const w = d.getWorld();
-    if (selection.hasUnits) w.commandUnits(selection.selectedUnits, x, y);
-    if (selection.hasWorkers) w.commandWorkers(selection.selectedWorkers, x, y);
+    commandAt(x, y);
   });
 
   input.onDrag({

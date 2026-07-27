@@ -9,22 +9,21 @@ import conquestData from '../data/conquest.json';
 import { MouseInput, Keyboard } from '../core/input';
 import { AudioEngine } from '../core/audio';
 import { loadDifficulty, loadConquestMap, type DifficultyId, type ConquestMapId } from '../core/storage';
-import { TILE, pixelToCell, cellToPixel } from '../game/grid';
 import { Controls } from '../ui/controls';
 import { ConquestWorld } from './conquestWorld';
 import { ConquestSelection } from './conquestSelection';
 import { ConquestControlGroups } from './controlGroups';
 import { ConquestMenu } from './conquestMenu';
+import { ConquestPlacement } from './conquestPlace';
 import { renderConquestHud, renderConquestOverlay, renderAttackMoveCursor } from './conquestHud';
 import { renderMinimap, type MinimapData } from './minimap';
 import { bindConquestInput } from './conquestInput';
+import { publishConquestTelemetry } from '../debug/conquestTelemetry';
 import type { BuildKind } from './building';
 import type { ConquestPhase } from './conquestWorld';
 
 const SPEEDS = [1, 2, 3];
 const BUILD_LABELS: Record<BuildKind, string> = { barracks: '배럭', turret: '포탑', depot: '보급고', factory: '공장' };
-const GHOST_OK = 'rgba(90, 220, 120, 0.35)';
-const GHOST_BAD = 'rgba(230, 70, 70, 0.35)';
 
 export interface ConquestDeps {
   onExit: () => void; // 타이틀 복귀(App이 정복 모드를 정리하고 타이틀을 그린다).
@@ -41,13 +40,13 @@ export class ConquestGame {
   private readonly menu: ConquestMenu;
   private readonly selection = new ConquestSelection();
   private readonly groups = new ConquestControlGroups();
+  private readonly placement = new ConquestPlacement(); // D8.5 배치 고스트 + 터치 2탭 대기 칸.
 
   private world = new ConquestWorld();
   private difficulty: DifficultyId = 'normal'; // 진입 시 저장값을 읽어 고정(재시작은 동일 유지).
   private conquestMap: ConquestMapId = 'standard'; // 진입 시 저장값을 읽어 고정(재시작은 동일 맵, D7.4).
   private placeKind: BuildKind | null = null;
   private attackMove = false; // A키 공격 이동 대기(좌클릭 지점으로 공격 이동).
-  private hoverCell: { cx: number; cy: number } | null = null;
   private speed = 1;
   private active = false;
 
@@ -92,7 +91,7 @@ export class ConquestGame {
       canInteract: () => this.canInteract(),
       getPlaceKind: () => this.placeKind,
       cancelPlace: () => this.cancelPlace(),
-      tryPlace: (x, y) => this.tryPlace(x, y),
+      tryPlace: (x, y, touch) => this.tryPlace(x, y, touch),
       isAttackMove: () => this.attackMove,
       setAttackMove: (v) => (this.attackMove = v),
       toggleMute: () => this.audio.toggleMute(), // M키 음소거(디펜스와 동일, 공유 엔진).
@@ -123,7 +122,7 @@ export class ConquestGame {
     this.groups.reset();
     this.placeKind = null;
     this.attackMove = false;
-    this.hoverCell = null;
+    this.placement.clear();
     this.menu.setActiveBuilding(null);
     this.menu.showHqPanel(null);
     this.setSpeed(1);
@@ -150,6 +149,7 @@ export class ConquestGame {
 
   private toggleBuild(kind: BuildKind): void {
     this.placeKind = this.placeKind === kind ? null : kind;
+    this.placement.clear(); // 모드 전환(해제/건물 변경) — 이전 터치 대기 칸은 무효.
     this.menu.setActiveBuilding(this.placeKind);
     if (this.placeKind) {
       this.selection.clear();
@@ -160,6 +160,7 @@ export class ConquestGame {
   // 건설 모드 해제(입력 모듈이 취소 시 호출).
   private cancelPlace(): void {
     this.placeKind = null;
+    this.placement.clear();
     this.menu.setActiveBuilding(null);
   }
 
@@ -167,9 +168,12 @@ export class ConquestGame {
     return this.active && this.world.phase === 'playing';
   }
 
-  private tryPlace(x: number, y: number): void {
+  // touch=true면 첫 탭은 대기 칸(미리보기)만 잡고, 같은 칸 재탭에서 착공한다(D8.5).
+  private tryPlace(x: number, y: number, touch: boolean): void {
     if (!this.placeKind) return;
-    const { cx, cy } = pixelToCell(x, y);
+    const cell = this.placement.tap(x, y, touch);
+    if (!cell) return;
+    const { cx, cy } = cell;
     const kind = this.placeKind;
     if (this.world.startBuild(kind, cx, cy)) {
       if (this.world.crystal < this.world.buildSpec(kind).cost) this.toggleBuild(kind);
@@ -180,22 +184,22 @@ export class ConquestGame {
   update(dt: number): void {
     if (!this.active) return;
     this.audio.resetFrame();
-    this.updateHover();
+    this.placement.updateHover(this.input, this.world, this.placeKind !== null);
     this.selection.prune(this.world.playerUnits, this.world.workers);
     this.groups.prune();
     if (this.attackMove && !this.selection.hasUnits) this.attackMove = false; // 대상 소멸 시 모드 해제.
     for (let i = 0; i < this.speed; i++) this.world.update(dt);
     this.syncPhase();
     this.syncUi();
-  }
-
-  private updateHover(): void {
-    if (this.placeKind && this.input.isInside && this.world.phase === 'playing') {
-      const { cx, cy } = pixelToCell(this.input.x, this.input.y);
-      this.hoverCell = this.world.grid.inBounds(cx, cy) ? { cx, cy } : null;
-    } else {
-      this.hoverCell = null;
-    }
+    // D8.5 터치 검증 하네스(읽기 전용) — 선택 수·아군 좌표만 노출한다.
+    publishConquestTelemetry({
+      crystal: this.world.crystal,
+      selectedUnits: this.selection.selectedUnits.length,
+      selectedWorkers: this.selection.selectedWorkers.length,
+      units: this.world.playerUnits.map((u) => ({ x: u.x, y: u.y })),
+      workers: this.world.workers.map((w) => ({ x: w.x, y: w.y })),
+      enemyUnits: this.world.units.reduce((n, u) => n + (u.side === 'enemy' && !u.dead ? 1 : 0), 0),
+    });
   }
 
   // 승패 전환 시(1회) 결과음 재생 + '다시 시작' 노출.
@@ -238,7 +242,7 @@ export class ConquestGame {
     const w = this.world;
 
     w.grid.render(ctx);
-    this.renderGhost(ctx);
+    if (this.placeKind) this.placement.render(ctx, w, this.placeKind);
     for (const c of w.crystals) c.render(ctx);
     w.enemyHQ.render(ctx);
     w.playerHQ.render(ctx);
@@ -284,15 +288,5 @@ export class ConquestGame {
       playerMobs: [...w.playerUnits, ...w.workers],
       enemyMobs: [...enemyUnits, ...w.enemyAI.workers],
     };
-  }
-
-  private renderGhost(ctx: CanvasRenderingContext2D): void {
-    if (!this.placeKind || !this.hoverCell) return;
-    const { cx, cy } = this.hoverCell;
-    const spec = this.world.buildSpec(this.placeKind);
-    const ok = this.world.canBuildAt(cx, cy) && this.world.crystal >= spec.cost && this.world.workers.length > 0;
-    const { x, y } = cellToPixel(cx, cy);
-    ctx.fillStyle = ok ? GHOST_OK : GHOST_BAD;
-    ctx.fillRect(x, y, TILE, TILE);
   }
 }

@@ -70,26 +70,20 @@ export class ConquestSelection {
 
   /** 좌클릭 — 전투 유닛 우선, 없으면 일꾼, 없으면 HQ, 그것도 아니면 해제. */
   clickSelect(px: number, py: number, units: CombatUnit[], workers: Worker[], hq: HQ): ClickResult {
-    const unit = nearestNear(px, py, units, (u) => u.radius);
-    if (unit) {
-      this.clear();
-      this.units = [unit];
-      return 'unit';
-    }
-    const worker = nearestNear(px, py, workers, (w) => w.radius);
-    if (worker) {
-      this.clear();
-      this.workers = [worker];
-      return 'worker';
-    }
-    const { cx, cy } = pixelToCell(px, py);
-    if (hq.occupies(cx, cy)) {
-      this.clear();
-      this.hq = hq;
-      return 'hq';
-    }
+    const p = pick(px, py, units, workers, hq);
     this.clear();
-    return 'none';
+    if (p.unit) this.units = [p.unit];
+    else if (p.worker) this.workers = [p.worker];
+    else if (p.kind === 'hq') this.hq = hq;
+    return p.kind;
+  }
+
+  /**
+   * 그 지점에 선택 가능한 아군이 있는지만 판정(상태 변경 없음).
+   * D8.5 터치 분기용 — 터치 탭은 아군이 있으면 선택, 없으면('none') 이동/공격 명령으로 갈린다.
+   */
+  hitTest(px: number, py: number, units: CombatUnit[], workers: Worker[], hq: HQ): ClickResult {
+    return pick(px, py, units, workers, hq).kind;
   }
 
   // ── 드래그 박스 다중 선택 ────────────────────────────────────
@@ -164,6 +158,24 @@ export class ConquestSelection {
     ctx.strokeRect(x + 0.5, y + 0.5, w, h);
     ctx.restore();
   }
+}
+
+// 클릭/탭 지점의 선택 대상 판정(순수 함수) — 전투 유닛 > 일꾼 > HQ 순.
+// clickSelect(선택 확정)와 hitTest(판정만)가 같은 우선순위를 공유하게 한 곳에 둔다.
+function pick(
+  px: number,
+  py: number,
+  units: CombatUnit[],
+  workers: Worker[],
+  hq: HQ,
+): { kind: ClickResult; unit?: CombatUnit; worker?: Worker } {
+  const unit = nearestNear(px, py, units, (u) => u.radius);
+  if (unit) return { kind: 'unit', unit };
+  const worker = nearestNear(px, py, workers, (w) => w.radius);
+  if (worker) return { kind: 'worker', worker };
+  const { cx, cy } = pixelToCell(px, py);
+  if (hq.occupies(cx, cy)) return { kind: 'hq' };
+  return { kind: 'none' };
 }
 
 // 클릭 지점 최근접(반경 내) 대상. 반경은 max(CLICK_RADIUS, 엔티티 반경).
