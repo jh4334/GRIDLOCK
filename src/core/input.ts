@@ -133,8 +133,11 @@ export class MouseInput {
   };
 
   // 우클릭 — 브라우저 컨텍스트 메뉴를 막고 좌표를 핸들러로 넘긴다.
+  // D8.3: 터치 롱프레스도 contextmenu를 발화시키므로(우클릭 핸들러가 설치 모드 취소·이동 명령을
+  // 의도치 않게 실행) 마지막 입력이 터치면 메뉴만 막고 핸들러는 호출하지 않는다.
   private readonly onContextMenu = (e: MouseEvent): void => {
     e.preventDefault();
+    if (this.lastKind === 'touch') return;
     if (!this.rightClickHandler) return;
     const { x, y } = this.toCanvas(e);
     this.rightClickHandler(x, y);

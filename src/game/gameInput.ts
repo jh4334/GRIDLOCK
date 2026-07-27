@@ -27,10 +27,12 @@ export interface GameInputDeps {
 export function bindGameInput(d: GameInputDeps): void {
   const { input, keyboard, flow, interaction, unitSelection, audio, isActive } = d;
 
-  // 좌클릭 — 설치 모드면 설치, 아니면 병사 선택 시도 후 실패 시 타워 선택/해제.
+  // 좌클릭/탭 — 설치 모드면 설치, 아니면 병사 선택 시도 후 실패 시 타워 선택/해제.
+  // D8.3: 터치 탭은 설치 모드에서 2탭 확정으로 갈리므로 입력 장치 종류를 함께 넘긴다.
   const handleLeftClick = (x: number, y: number): void => {
+    const touch = input.pointerType === 'touch';
     if (interaction.isPlacing) {
-      interaction.handleClick(x, y);
+      interaction.handleClick(x, y, touch);
       return;
     }
     if (unitSelection.trySelectAt(x, y)) {
@@ -38,7 +40,7 @@ export function bindGameInput(d: GameInputDeps): void {
       return;
     }
     unitSelection.clear(); // 빈 곳/타워 클릭 → 병사 선택 해제.
-    interaction.handleClick(x, y);
+    interaction.handleClick(x, y, touch);
   };
 
   input.onClick((x, y) => {
