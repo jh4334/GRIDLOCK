@@ -39,6 +39,12 @@
         box-sizing: border-box;
         max-width: 100%;
         height: auto;
+        /* 포인터 이벤트 통일(D8.2) — 캔버스 위 터치는 전부 게임 입력으로만 쓴다.
+           스크롤·핀치/더블탭 줌 차단(touch-action), 롱프레스 텍스트 선택·콜아웃 차단. */
+        touch-action: none;
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-touch-callout: none;
       }
       #controls,
       #conquest-controls {

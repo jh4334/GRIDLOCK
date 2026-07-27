@@ -67,6 +67,8 @@ export function bindConquestInput(d: ConquestInputDeps): void {
       if (!d.canInteract()) return selection.cancelDrag();
       selection.endDrag(box, d.getWorld().playerUnits, d.getWorld().workers);
     },
+    // 포인터 취소(D8.2) — 선택을 확정하지 않고 드래그 박스만 되돌린다.
+    onCancel: () => selection.cancelDrag(),
   });
 
   // A — 유닛 선택 상태에서 공격 이동 모드 진입(건설 모드는 해제).
