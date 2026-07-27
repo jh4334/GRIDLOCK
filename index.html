@@ -2,7 +2,7 @@
 <html lang="ko">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>GRIDLOCK</title>
     <style>
       /* NEON GRID — 다크 네이비 + 네온 글로우 UI 테마. */
@@ -14,17 +14,31 @@
         color: #cdd7e5;
         font-family: system-ui, sans-serif;
       }
+      /* 반응형(D8.1) — safe-area 여백. 게임 로직·캔버스 내부 해상도(960×672)는 불변, CSS만 축소. */
+      body {
+        padding: env(safe-area-inset-top) env(safe-area-inset-right)
+          env(safe-area-inset-bottom) env(safe-area-inset-left);
+      }
       #app {
         display: flex;
         flex-direction: column;
         align-items: center;
         padding-top: 16px;
+        /* 자식(캔버스·바)이 컨테이너를 넘지 않게 — 가로 스크롤 방지의 기준선. */
+        max-width: 100%;
+        overflow-x: clip;
       }
       #game-canvas {
         background: #1a2416;
         border: 1px solid rgba(201, 176, 92, 0.30);
         border-radius: 4px;
         box-shadow: 0 0 24px rgba(150, 170, 90, 0.14);
+        /* 픽셀아트 — 축소 시에도 뭉개지지 않게. */
+        image-rendering: pixelated;
+        /* 비율(960:672) 유지 축소. 테두리 2px까지 포함해 100%를 넘지 않도록 border-box. */
+        box-sizing: border-box;
+        max-width: 100%;
+        height: auto;
       }
       #controls,
       #conquest-controls {
@@ -32,8 +46,9 @@
         display: flex;
         align-items: center;
         justify-content: center;
+        flex-wrap: wrap;
         gap: 12px;
-        width: 960px;
+        width: min(960px, 100%);
       }
       /* 공용 네온 버튼 베이스. */
       .next-wave-btn,
@@ -71,6 +86,8 @@
       .wave-preview {
         display: flex;
         align-items: center;
+        justify-content: center;
+        flex-wrap: wrap;
         gap: 10px;
         padding: 2px 4px;
       }
@@ -138,10 +155,12 @@
         flex-direction: column;
         align-items: center;
         gap: 10px;
-        width: 960px;
+        width: min(960px, 100%);
       }
       .tower-buttons {
         display: flex;
+        justify-content: center;
+        flex-wrap: wrap;
         gap: 10px;
       }
       .tower-btn {
@@ -180,6 +199,7 @@
         min-height: 92px;
         display: flex;
         justify-content: center;
+        max-width: 100%;
       }
       .tower-panel {
         display: flex;
@@ -199,12 +219,16 @@
       }
       .tp-stats {
         display: flex;
+        justify-content: center;
+        flex-wrap: wrap;
         gap: 14px;
         font-size: 13px;
         color: #a8bcd6;
       }
       .tp-actions {
         display: flex;
+        justify-content: center;
+        flex-wrap: wrap;
         gap: 10px;
       }
       .upgrade-btn {
@@ -238,6 +262,8 @@
       }
       .tp-special-row {
         display: flex;
+        justify-content: center;
+        flex-wrap: wrap;
         gap: 8px;
       }
       .special-btn {
@@ -295,8 +321,64 @@
       }
       .volume-slider {
         width: 96px;
+        max-width: 100%;
         accent-color: #39d5ff;
         cursor: pointer;
+      }
+      /* 좁은 화면(D8.1) — 간격·패딩만 축소해 과밀을 완화한다.
+         버튼 크기 확대와 축약 레이아웃은 D8.4 몫이므로 여기서 구조는 바꾸지 않는다. */
+      @media (max-width: 700px) {
+        #app {
+          padding-top: 8px;
+        }
+        #controls,
+        #conquest-controls,
+        #build-menu,
+        #conquest-menu {
+          margin-top: 8px;
+          gap: 8px;
+        }
+        .next-wave-btn,
+        .restart-btn,
+        .to-title-btn,
+        .endless-btn {
+          padding: 8px 12px;
+        }
+        .wave-preview {
+          gap: 6px;
+          padding: 0;
+        }
+        .speed-btn {
+          min-width: 36px;
+          padding: 8px;
+        }
+        .tower-buttons {
+          gap: 6px;
+        }
+        .tower-btn {
+          min-width: 76px;
+          padding: 8px 8px;
+          font-size: 13px;
+        }
+        .tower-panel {
+          padding: 8px 10px;
+        }
+        .tp-stats {
+          gap: 10px;
+        }
+        .special-btn {
+          min-width: 88px;
+        }
+        .audio-controls {
+          gap: 6px;
+        }
+        .mute-btn {
+          min-width: 54px;
+          padding: 8px;
+        }
+        .volume-slider {
+          width: 72px;
+        }
       }
     </style>
   </head>

@@ -91,7 +91,7 @@
 
 현황 진단: 캔버스 960×672 고정(CSS 축소 없음 → 폰에서 가로 스크롤), 입력이 마우스 이벤트 전용(src/core/input.ts — 호버 미리보기·우클릭 취소가 터치에서 불가), 컨트롤 바·빌드 메뉴 `width: 960px` 고정, 터치 타깃 44px 미달. 좌표 변환은 이미 getBoundingClientRect 스케일 보정이 있어 CSS 축소와 호환됨.
 
-- [ ] D8.1 반응형 레이아웃: 캔버스 `max-width: 100%` 비율 유지 축소(aspect-ratio), 컨트롤 바·빌드 메뉴·타이틀을 고정 960px → `max-width` + flex-wrap, 좁은 화면 미디어쿼리(≤700px), `viewport-fit=cover` + safe-area 여백. 게임 로직·캔버스 내부 해상도는 불변(CSS만) [DoD: 390×844 뷰포트에서 가로 스크롤 없이 전 화면 표시, 데스크톱 회귀 없음]
+- [x] D8.1 반응형 레이아웃: 캔버스 `max-width: 100%` 비율 유지 축소(aspect-ratio), 컨트롤 바·빌드 메뉴·타이틀을 고정 960px → `max-width` + flex-wrap, 좁은 화면 미디어쿼리(≤700px), `viewport-fit=cover` + safe-area 여백. 게임 로직·캔버스 내부 해상도는 불변(CSS만) [DoD: 390×844 뷰포트에서 가로 스크롤 없이 전 화면 표시, 데스크톱 회귀 없음]
 - [ ] D8.2 포인터 이벤트 통일: src/core/input.ts의 mouse* 리스너를 Pointer Events로 마이그레이션(pointermove/pointerdown/pointerup/pointercancel), 캔버스 `touch-action: none`으로 스크롤·더블탭줌 충돌 방지. 기존 마우스 동작(호버·좌/우클릭)은 pointerType으로 완전 호환 유지 [DoD: 데스크톱 전 기능 회귀 없음 + 터치 에뮬레이션에서 탭이 클릭으로 동작]
 - [ ] D8.3 터치 배치 UX: 터치(pointerType=touch)에서 호버·우클릭 대체 — 첫 탭 = 해당 칸에 고스트+사거리 미리보기(확정 아님), 같은 칸 재탭 = 배치 확정, 다른 칸 탭 = 미리보기 이동, 빈 곳/취소 버튼 = 선택 해제. 벽 드래그 연속 배치는 pointermove로 유지 [DoD: 터치 에뮬레이션에서 오배치 없이 타워·벽 배치 가능, 마우스 UX 불변]
 - [ ] D8.4 터치 타깃·HUD 밀도: 모든 버튼 최소 터치 타깃 44×44px(패딩 확대), 좁은 화면에서 빌드 메뉴·컨트롤 축약 레이아웃(아이콘화/2단 배치), HUD 폰트 가독성 점검 [DoD: 390px 폭에서 모든 버튼이 겹침 없이 탭 가능]
