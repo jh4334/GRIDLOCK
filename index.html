@@ -331,8 +331,8 @@
         accent-color: #39d5ff;
         cursor: pointer;
       }
-      /* 좁은 화면(D8.1) — 간격·패딩만 축소해 과밀을 완화한다.
-         버튼 크기 확대와 축약 레이아웃은 D8.4 몫이므로 여기서 구조는 바꾸지 않는다. */
+      /* 좁은 화면(D8.1) — 간격·패딩 축소로 과밀 완화 + 축약 레이아웃(D8.4).
+         DOM 순서는 그대로 두고 order/grid로만 재배치한다. */
       @media (max-width: 700px) {
         #app {
           padding-top: 8px;
@@ -358,13 +358,44 @@
           min-width: 36px;
           padding: 8px;
         }
+        /* 타워/건물 버튼 — 3열 그리드(타워 5종은 2행, 정복 건물 3종은 1행).
+           flex-wrap이 만들던 "4개+1개" 비대칭 줄을 없애고 버튼 폭을 균등하게 키운다(D8.4). */
         .tower-buttons {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
           gap: 6px;
+          width: 100%;
+          box-sizing: border-box;
+          padding: 0 4px;
         }
         .tower-btn {
-          min-width: 76px;
+          min-width: 0;
           padding: 8px 8px;
           font-size: 13px;
+        }
+        /* 컨트롤 바 우선순위(D8.4) — 다음 웨이브·배속을 첫 줄에 두고, 웨이브 프리뷰는
+           한 줄을 통째로 차지하게 내린다. 결과·오디오는 그 뒤. DOM 순서는 불변. */
+        .next-wave-btn {
+          order: 1;
+        }
+        .speed-group {
+          order: 2;
+        }
+        .wave-preview {
+          order: 3;
+          flex-basis: 100%;
+        }
+        .endless-btn {
+          order: 4;
+        }
+        .restart-btn {
+          order: 5;
+        }
+        .to-title-btn {
+          order: 6;
+        }
+        .audio-controls {
+          order: 7;
         }
         .tower-panel {
           padding: 8px 10px;
@@ -384,6 +415,70 @@
         }
         .volume-slider {
           width: 72px;
+        }
+      }
+      /* 터치 타깃(D8.4) — coarse 포인터(터치)에서만 모든 버튼을 최소 44×44px로 키운다.
+         마우스(pointer: fine)는 이 블록에 걸리지 않으므로 데스크톱 레이아웃은 완전히 불변.
+         좁은 화면 블록보다 뒤에 둬 min-width 축소값(예: 배속 36px)을 덮어쓴다. */
+      @media (pointer: coarse) {
+        .next-wave-btn,
+        .speed-btn,
+        .restart-btn,
+        .to-title-btn,
+        .endless-btn,
+        .tower-btn,
+        .upgrade-btn,
+        .sell-btn,
+        .special-btn,
+        .mute-btn {
+          min-height: 44px;
+        }
+        .speed-btn {
+          min-width: 44px;
+        }
+        .mute-btn {
+          min-width: 56px;
+        }
+        /* 세로로 늘어난 만큼 라벨을 가운데로(위쪽 쏠림 방지). */
+        .tower-btn,
+        .special-btn {
+          justify-content: center;
+        }
+        /* 슬라이더 — 트랙은 얇게 두고 터치 영역(높이)과 thumb만 키운다.
+           thumb 크기를 지정하려면 네이티브 외형을 꺼야 해서 트랙/thumb를 직접 칠한다. */
+        .volume-slider {
+          height: 44px;
+          margin: 0;
+          -webkit-appearance: none;
+          appearance: none;
+          background: transparent;
+        }
+        .volume-slider::-webkit-slider-runnable-track {
+          height: 6px;
+          border-radius: 3px;
+          background: rgba(120, 170, 230, 0.35);
+        }
+        .volume-slider::-webkit-slider-thumb {
+          -webkit-appearance: none;
+          width: 24px;
+          height: 24px;
+          margin-top: -9px;
+          border: none;
+          border-radius: 50%;
+          background: #39d5ff;
+          box-shadow: 0 0 8px rgba(57, 213, 255, 0.5);
+        }
+        .volume-slider::-moz-range-track {
+          height: 6px;
+          border-radius: 3px;
+          background: rgba(120, 170, 230, 0.35);
+        }
+        .volume-slider::-moz-range-thumb {
+          width: 24px;
+          height: 24px;
+          border: none;
+          border-radius: 50%;
+          background: #39d5ff;
         }
       }
     </style>

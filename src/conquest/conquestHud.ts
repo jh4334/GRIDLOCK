@@ -4,6 +4,7 @@
 
 import type { ConquestPhase } from './conquestWorld';
 import type { DifficultyId } from '../core/storage';
+import { hudScale } from '../ui/uiScale';
 
 export interface ConquestHudInfo {
   crystal: number;
@@ -26,31 +27,43 @@ const COLOR_WIN = '#7bd67b';
 const COLOR_LOSE = '#ff6b6b';
 const COLOR_SUB = '#e0e0e0';
 
+// 시각 상수(밸런스 아님) — 배율 1(데스크톱) 기준. 모바일 축소 시 hudScale로 함께 키운다(D8.4).
+const HUD_PX = 16;
+const HUD_MARGIN = 8;
+const HUD_LINE = 20;
+const OV_TITLE_PX = 56;
+const OV_SUB_PX = 22;
+const OV_TITLE_DY = -20;
+const OV_SUB_DY = 32;
+
 export function renderConquestHud(ctx: CanvasRenderingContext2D, info: ConquestHudInfo): void {
+  const s = hudScale(ctx.canvas); // 캔버스 CSS 축소 보정(읽기 전용).
   ctx.save();
-  ctx.font = '16px monospace';
+  ctx.font = `${HUD_PX * s}px monospace`;
   ctx.textBaseline = 'top';
   ctx.textAlign = 'right';
-  const right = ctx.canvas.width - 8;
+  const margin = HUD_MARGIN * s;
+  const line = HUD_LINE * s;
+  const right = ctx.canvas.width - margin;
 
   ctx.fillStyle = '#5be0d0';
-  ctx.fillText(`크리스탈 ${info.crystal}`, right, 8);
+  ctx.fillText(`크리스탈 ${info.crystal}`, right, margin);
 
   const popFull = info.popUsed >= info.popMax;
   ctx.fillStyle = popFull ? '#ff6b6b' : '#9ad0ff';
-  ctx.fillText(`인구 ${info.popUsed}/${info.popMax}`, right, 28);
+  ctx.fillText(`인구 ${info.popUsed}/${info.popMax}`, right, margin + line);
 
   // 다음 공격 임박(10초 이하) 시 붉게 강조. 옆에 현재 난이도 소형 표시.
   ctx.textAlign = 'left';
   ctx.fillStyle = info.secondsToAttack <= 10 ? '#ff8a6a' : '#e0b357';
   const attackText = `적 공격까지 ${info.secondsToAttack}초 `;
-  ctx.fillText(attackText, 8, 8);
+  ctx.fillText(attackText, margin, margin);
   ctx.fillStyle = '#8fa8c8';
-  ctx.fillText(`[${DIFFICULTY_LABELS[info.difficulty]}]`, 8 + ctx.measureText(attackText).width, 8);
+  ctx.fillText(`[${DIFFICULTY_LABELS[info.difficulty]}]`, margin + ctx.measureText(attackText).width, margin);
 
   // 아군 병력 수(배럭 선택 없이도 현재 병력 확인).
   ctx.fillStyle = '#9ad0ff';
-  ctx.fillText(`병력 ${info.unitCount}`, 8, 28);
+  ctx.fillText(`병력 ${info.unitCount}`, margin, margin + line);
 
   ctx.restore();
 }
@@ -79,6 +92,7 @@ export function renderConquestOverlay(ctx: CanvasRenderingContext2D, phase: Conq
   if (phase === 'playing') return;
   const w = ctx.canvas.width;
   const h = ctx.canvas.height;
+  const s = hudScale(ctx.canvas); // 캔버스 CSS 축소 보정(읽기 전용).
 
   ctx.save();
   ctx.fillStyle = OVERLAY_BG;
@@ -88,11 +102,11 @@ export function renderConquestOverlay(ctx: CanvasRenderingContext2D, phase: Conq
 
   const won = phase === 'won';
   ctx.fillStyle = won ? COLOR_WIN : COLOR_LOSE;
-  ctx.font = 'bold 56px system-ui, sans-serif';
-  ctx.fillText(won ? '정복 성공!' : '본진 함락...', w / 2, h / 2 - 20);
+  ctx.font = `bold ${OV_TITLE_PX * s}px system-ui, sans-serif`;
+  ctx.fillText(won ? '정복 성공!' : '본진 함락...', w / 2, h / 2 + OV_TITLE_DY * s);
 
   ctx.fillStyle = COLOR_SUB;
-  ctx.font = '22px system-ui, sans-serif';
-  ctx.fillText(won ? '적 본진을 파괴했다' : '적에게 본진을 빼앗겼다', w / 2, h / 2 + 32);
+  ctx.font = `${OV_SUB_PX * s}px system-ui, sans-serif`;
+  ctx.fillText(won ? '적 본진을 파괴했다' : '적에게 본진을 빼앗겼다', w / 2, h / 2 + OV_SUB_DY * s);
   ctx.restore();
 }
