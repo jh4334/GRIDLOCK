@@ -27,10 +27,12 @@ export interface GameInputDeps {
 export function bindGameInput(d: GameInputDeps): void {
   const { input, keyboard, flow, interaction, unitSelection, audio, isActive } = d;
 
-  // 좌클릭 — 설치 모드면 설치, 아니면 병사 선택 시도 후 실패 시 타워 선택/해제.
+  // 좌클릭/탭 — 설치 모드면 설치, 아니면 병사 선택 시도 후 실패 시 타워 선택/해제.
+  // D8.3: 터치 탭은 설치 모드에서 2탭 확정으로 갈리므로 입력 장치 종류를 함께 넘긴다.
   const handleLeftClick = (x: number, y: number): void => {
+    const touch = input.pointerType === 'touch';
     if (interaction.isPlacing) {
-      interaction.handleClick(x, y);
+      interaction.handleClick(x, y, touch);
       return;
     }
     if (unitSelection.trySelectAt(x, y)) {
@@ -38,7 +40,7 @@ export function bindGameInput(d: GameInputDeps): void {
       return;
     }
     unitSelection.clear(); // 빈 곳/타워 클릭 → 병사 선택 해제.
-    interaction.handleClick(x, y);
+    interaction.handleClick(x, y, touch);
   };
 
   input.onClick((x, y) => {
@@ -57,6 +59,8 @@ export function bindGameInput(d: GameInputDeps): void {
       }
       if (unitSelection.endDrag(box) > 0) interaction.clearTowerSelection();
     },
+    // 포인터 취소(D8.2) — 선택을 확정하지 않고 드래그 박스만 되돌린다.
+    onCancel: () => unitSelection.cancelDrag(),
   });
 
   // 우클릭 — 설치 모드면 설치 취소(D2.1), 아니면 병사 이동 명령, 그도 없으면 배럭 집결지 지정(M10/M11).

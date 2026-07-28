@@ -2,6 +2,8 @@
 // interaction의 거부 플래시와 같은 패턴: update가 타이머를 감소시키고 render는 읽기만 한다.
 // 문구는 밸런스가 아닌 UI 카피이므로 코드 상수로 둔다(CLAUDE.md 예외).
 
+import { hudScale } from './uiScale';
+
 // 설치 실패 사유 문구(코드 상수).
 export const MSG_GOLD = '골드가 부족합니다';
 export const MSG_BLOCKADE = '길을 완전히 막을 수 없습니다';
@@ -11,7 +13,7 @@ export const MSG_OCCUPIED = '설치할 수 없는 칸입니다';
 const TOAST_TIME = 1.5; // 표시 지속(초).
 const FADE_TIME = 0.5; // 마지막 0.5초 동안 서서히 사라짐.
 const MARGIN_BOTTOM = 44; // 캔버스 하단에서의 여백(px).
-const FONT = 'bold 20px system-ui, sans-serif';
+const FONT_PX = 20; // 배율 1(데스크톱) 기준 크기 — 모바일에선 hudScale로 키운다(D8.4).
 const COLOR_TEXT = '#ffd24a';
 const COLOR_SHADOW = 'rgba(0, 0, 0, 0.75)';
 
@@ -36,11 +38,12 @@ export class Toast {
   render(ctx: CanvasRenderingContext2D): void {
     if (this.timer <= 0) return;
     const alpha = Math.min(1, this.timer / FADE_TIME); // 마지막 FADE_TIME초 동안만 페이드.
+    const s = hudScale(ctx.canvas); // 캔버스 CSS 축소 보정(읽기 전용).
     const x = ctx.canvas.width / 2;
-    const y = ctx.canvas.height - MARGIN_BOTTOM;
+    const y = ctx.canvas.height - MARGIN_BOTTOM * s;
     ctx.save();
     ctx.globalAlpha = alpha;
-    ctx.font = FONT;
+    ctx.font = `bold ${FONT_PX * s}px system-ui, sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = COLOR_SHADOW;

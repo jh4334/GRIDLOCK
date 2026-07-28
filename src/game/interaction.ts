@@ -8,30 +8,21 @@ import { TILE, cellToPixel, pixelToCell } from './grid';
 import type { Economy } from './economy';
 import type { Enemy } from '../entities/enemy';
 import { Tower, towerSpec, TowerKind } from '../entities/tower';
-import { drawTower, type TowerVisualKind } from '../render/towerSprites';
 import { barracksList, barracksPanelSig, setRallyFromClick, renderUnits, createTower, towerPanelInfo, sellRefund, chooseTowerSpecial } from './barracksInteraction';
 import { isCellPlaceable, isPathClear } from '../systems/placement';
 import { PathPreview } from './pathPreview';
+import { TouchPlacement, renderGhostCell, renderHoverCell, type Ghost } from './touchPlace';
 import type { BuildMenu } from '../ui/buildMenu';
 import { Toast, MSG_GOLD, MSG_BLOCKADE, MSG_OCCUPIED } from '../ui/toast';
 
-// 시각 상수(밸런스 아님).
-const COLOR_HOVER = 'rgba(255, 255, 255, 0.18)';
-const COLOR_GHOST_OK = 'rgba(90, 220, 120, 0.35)'; // 설치 가능 칸
-const COLOR_GHOST_BAD = 'rgba(230, 70, 70, 0.35)'; // 설치 불가 칸
+// 시각 상수(밸런스 아님). 호버/고스트 색은 touchPlace.ts가 소유한다.
 const COLOR_REJECT = '#ff4040'; // 봉쇄 거부 플래시
-const GHOST_ALPHA = 0.5; // 고스트 타워 반투명도
 const REJECT_FLASH_TIME = 0.3; // 거부 플래시 지속(초)
 
 interface Flash {
   cx: number;
   cy: number;
   timer: number;
-}
-interface Ghost {
-  cx: number;
-  cy: number;
-  valid: boolean;
 }
 
 export interface InteractionDeps {
@@ -52,11 +43,13 @@ export class Interaction {
   private hoverCell: { cx: number; cy: number } | null = null;
   private readonly toast = new Toast(); // 설치 불가 사유 안내(D2.1). update가 타이머 관리, render는 읽기만.
   private readonly preview = new PathPreview(); // D2.2 예상 경로 미리보기. updateHover가 계산, render는 읽기만.
+  private readonly touch = new TouchPlacement(); // D8.3 터치 2탭 배치의 대기 칸(터치 탭에서만 갱신).
 
   constructor(private deps: InteractionDeps) {}
 
   // ── 모드 전환 ────────────────────────────────────────────────
   toggleTower(kind: TowerKind): void {
+    this.touch.clear(); // 모드 전환(해제/타워 변경) — 이전 대기 칸은 무효.
     if (this.placeKind === kind) {
       this.exitPlaceMode();
       return;
@@ -69,6 +62,7 @@ export class Interaction {
   private exitPlaceMode(): void {
     this.placeKind = null;
     this.ghost = null;
+    this.touch.clear();
     this.deps.buildMenu.setActiveTower(null);
   }
 
@@ -151,11 +145,18 @@ export class Interaction {
   }
 
   // ── 클릭 처리 ────────────────────────────────────────────────
-  handleClick(px: number, py: number): void {
+  // touch=true는 터치 탭(D8.3) — 설치 모드에서만 2탭 확정으로 갈라진다. 마우스는 기존 즉시 배치.
+  handleClick(px: number, py: number, touch = false): void {
     const { cx, cy } = pixelToCell(px, py);
     if (!this.deps.grid.inBounds(cx, cy)) return;
 
     if (this.placeKind) {
+      // 첫 탭/다른 칸 탭 = 대기 칸만 이동(미리보기), 같은 칸 재탭 = 확정.
+      if (touch) {
+        if (this.touch.tap(cx, cy) === 'preview') return;
+      } else {
+        this.touch.clear(); // 마우스 클릭이 끼어들면(하이브리드 기기) 남은 대기 칸은 무효.
+      }
       this.tryPlace(this.placeKind, cx, cy);
       return;
     }
@@ -205,7 +206,9 @@ export class Interaction {
 
   // ── update(상태 변경) — 호버 칸 + 설치 고스트 + 예상 경로 계산. render는 읽기만. ──
   updateHover(input: MouseInput): void {
-    const c = input.isInside ? pixelToCell(input.x, input.y) : null;
+    // 터치는 손을 떼면 호버가 끊기므로 2탭 대기 칸을 호버 칸으로 공급해 고스트·경로 미리보기를 유지한다.
+    const pending = input.pointerType === 'touch' ? this.touch.cell : null;
+    const c = pending ?? (input.isInside ? pixelToCell(input.x, input.y) : null);
     this.hoverCell = c && this.deps.grid.inBounds(c.cx, c.cy) ? { cx: c.cx, cy: c.cy } : null;
 
     if (this.placeKind && this.hoverCell) {
@@ -235,6 +238,7 @@ export class Interaction {
     this.ghost = null;
     this.flash = null;
     this.hoverCell = null;
+    this.touch.clear();
     this.preview.clear();
     this.toast.reset();
     this.lastPanelSig = '';
@@ -245,8 +249,9 @@ export class Interaction {
   // ── render(읽기 전용) — 그리기 순서는 Game.render가 조율한다. ──
   renderHoverOrGhost(ctx: CanvasRenderingContext2D): void {
     this.preview.render(ctx); // 예상 경로(회색 반투명 도로)는 고스트/호버 타일 아래에 깐다.
-    if (this.ghost) this.renderGhost(ctx, this.ghost);
-    else this.renderHover(ctx);
+    // 사거리 링은 터치 대기 칸일 때만 덧그린다 — 마우스 호버 고스트는 기존 그대로.
+    if (this.ghost && this.placeKind) renderGhostCell(ctx, this.ghost, this.placeKind, this.touch.cell !== null);
+    else renderHoverCell(ctx, this.hoverCell);
   }
 
   renderTowers(ctx: CanvasRenderingContext2D): void {
@@ -274,27 +279,5 @@ export class Interaction {
   /** 설치 불가 사유 토스트(하단 중앙). HUD 위 레이어에 그린다 — Game.render가 조율. */
   renderToast(ctx: CanvasRenderingContext2D): void {
     this.toast.render(ctx);
-  }
-
-  private renderHover(ctx: CanvasRenderingContext2D): void {
-    if (!this.hoverCell) return;
-    const { x, y } = cellToPixel(this.hoverCell.cx, this.hoverCell.cy);
-    ctx.fillStyle = COLOR_HOVER;
-    ctx.fillRect(x, y, TILE, TILE);
-  }
-
-  private renderGhost(ctx: CanvasRenderingContext2D, g: Ghost): void {
-    const { x, y } = cellToPixel(g.cx, g.cy);
-    // 설치 가능=초록 / 불가=빨강 칸 표시.
-    ctx.fillStyle = g.valid ? COLOR_GHOST_OK : COLOR_GHOST_BAD;
-    ctx.fillRect(x, y, TILE, TILE);
-
-    // 반투명 고스트 타워 — 실제 설치 스프라이트를 반투명하게 미리 보여준다.
-    if (this.placeKind) {
-      ctx.save();
-      ctx.globalAlpha = GHOST_ALPHA;
-      drawTower(ctx, this.placeKind as TowerVisualKind, 1, x + TILE / 2, y + TILE / 2, 0);
-      ctx.restore();
-    }
   }
 }
