@@ -1,6 +1,7 @@
 // 부트스트랩 — 캔버스/컨텍스트를 확보해 App에 넘기고 루프를 시작한다.
 // 타이틀에서 디펜스/정복 모드를 고르고, 모드 조율은 App(app.ts)이 담당한다.
 
+import './styles/main.css'; // UI 스타일(D9.1) — Vite가 번들·주입한다.
 import { App } from './app';
 import { loadKenneyAssets } from './render/assetLoader';
 import { exposeMapGen } from './debug/mapGenTelemetry';
