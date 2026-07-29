@@ -18,6 +18,8 @@ import { hudScale } from './ui/uiScale';
 import { tickClock } from './render/sprites';
 import { applyViewportTransform } from './render/viewport';
 import { exposeSeedPlay } from './debug/balanceProbe';
+import { exposeHudMetrics } from './debug/hudTelemetry';
+import { measureSeedText } from './ui/hud';
 
 type Mode = 'title' | 'defense' | 'conquest';
 
@@ -94,6 +96,9 @@ export class App {
       const g = generateMap(seed);
       this.game.activate(g.terrain, g.spawns, { seed, mode: 'random' });
     });
+
+    // D9.5 시드 부제 가독성 검증 훅 — 캔버스에 그린 텍스트라 DOM으로 못 재는 값을 노출한다.
+    exposeHudMetrics((text) => measureSeedText(this.ctx, text));
   }
 
   // 타이틀 UI 상태 — 렌더와 히트 판정이 같은 값을 받아야 그린 자리와 누른 자리가 일치한다.
