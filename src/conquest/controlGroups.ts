@@ -41,6 +41,12 @@ export class ConquestControlGroups {
     return { units: g.units, workers: g.workers };
   }
 
+  /** n번 부대 인원 수(전투 유닛 + 일꾼). 빈 부대는 0 — D9.4 부대 버튼 배지용. */
+  size(n: number): number {
+    const g = this.groups.get(n);
+    return g ? g.units.length + g.workers.length : 0;
+  }
+
   /** 죽은 부대원 제외 — 매 프레임 호출. 빈 부대는 삭제. */
   prune(): void {
     for (const [n, g] of this.groups) {

@@ -65,6 +65,8 @@ body {
 .upgrade-btn,
 .sell-btn,
 .special-btn,
+.attack-move-btn,
+.group-btn,
 .mute-btn {
   font-family: inherit;
   font-size: 14px;
@@ -304,6 +306,51 @@ body {
   font-weight: 600;
   color: #ffc94d;
 }
+/* 정복 명령 버튼(D9.4) — 공격이동 토글 + 부대 1·2·3. 터치엔 A키·Ctrl+숫자가 없어
+   같은 동작을 버튼으로 노출한다(마우스도 동일 동작). DOM은 컨트롤 바 끝에 붙지만
+   order로 맨 앞에 배치해 배속·오디오보다 먼저 오게 한다. */
+.conquest-cmd {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  order: -1;
+}
+.attack-move-btn {
+  padding: 8px 14px;
+  border-color: rgba(255, 107, 107, 0.55);
+  color: #ffd7d7;
+}
+.attack-move-btn:hover:not(:disabled) {
+  border-color: #ff6b6b;
+  box-shadow: 0 0 12px rgba(255, 107, 107, 0.45);
+}
+/* 대기 중 강조 — 캔버스의 공격 이동 커서(#ff6b6b)와 같은 계열로 맞춘다. */
+.attack-move-btn.active {
+  border-color: #ff6b6b;
+  background: rgba(66, 26, 30, 0.9);
+  color: #ffe4e4;
+  box-shadow: 0 0 14px rgba(255, 107, 107, 0.55);
+}
+.group-btn {
+  min-width: 46px;
+  padding: 8px 8px;
+}
+.group-btn:hover:not(:disabled) {
+  border-color: #39d5ff;
+  box-shadow: 0 0 10px rgba(57, 213, 255, 0.35);
+}
+/* 빈 부대는 흐리게(저장은 가능하므로 비활성과 구분). */
+.group-btn.empty {
+  color: #6b788c;
+}
+.attack-move-btn:disabled,
+.group-btn:disabled {
+  color: #4a5468;
+  background: rgba(16, 22, 34, 0.8);
+  border-color: rgba(80, 96, 120, 0.3);
+  cursor: not-allowed;
+  box-shadow: none;
+}
 /* 사운드 옵션(D2.6) — 음소거 토글 + 음량 슬라이더. 컨트롤 바 우측에 붙는다. */
 .audio-controls {
   display: flex;
@@ -357,6 +404,17 @@ body {
   .speed-btn {
     min-width: 36px;
     padding: 8px;
+  }
+  /* 정복 명령 버튼(D9.4) — 좁은 화면에선 패딩만 줄인다(coarse 44px는 뒤 블록이 보장). */
+  .conquest-cmd {
+    gap: 4px;
+  }
+  .attack-move-btn {
+    padding: 8px 10px;
+  }
+  .group-btn {
+    min-width: 40px;
+    padding: 8px 6px;
   }
   /* 타워/건물 버튼 — 3열 그리드(타워 5종은 2행, 정복 건물 3종은 1행).
      flex-wrap이 만들던 "4개+1개" 비대칭 줄을 없애고 버튼 폭을 균등하게 키운다(D8.4). */
@@ -430,10 +488,13 @@ body {
   .upgrade-btn,
   .sell-btn,
   .special-btn,
+  .attack-move-btn,
+  .group-btn,
   .mute-btn {
     min-height: 44px;
   }
-  .speed-btn {
+  .speed-btn,
+  .group-btn {
     min-width: 44px;
   }
   .mute-btn {

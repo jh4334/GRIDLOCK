@@ -17,7 +17,8 @@ import { ConquestMenu } from './conquestMenu';
 import { ConquestPlacement } from './conquestPlace';
 import { renderConquestHud, renderConquestOverlay, renderAttackMoveCursor } from './conquestHud';
 import { renderMinimap, type MinimapData } from './minimap';
-import { bindConquestInput } from './conquestInput';
+import { bindConquestInput, type ConquestInputDeps } from './conquestInput';
+import { ConquestCommandBar } from './conquestCommandBar';
 import { publishConquestTelemetry } from '../debug/conquestTelemetry';
 import { VIEW_W, VIEW_H } from '../render/viewport';
 import type { BuildKind } from './building';
@@ -38,6 +39,7 @@ export class ConquestGame {
   private readonly audio: AudioEngine; // App이 주입(공유 엔진). 생성자에서 deps로부터 대입.
   private readonly controls: Controls;
   private readonly menu: ConquestMenu;
+  private readonly commandBar: ConquestCommandBar; // D9.4 공격이동·부대 버튼(키보드와 동작 공유).
   private readonly selection = new ConquestSelection();
   private readonly groups = new ConquestControlGroups();
   private readonly placement = new ConquestPlacement(); // D8.5 배치 고스트 + 터치 2탭 대기 칸.
@@ -80,7 +82,8 @@ export class ConquestGame {
       onProduceWorker: () => this.world.produceWorker(),
     });
 
-    bindConquestInput({
+    // 입력(키·마우스)과 D9.4 명령 버튼이 같은 의존성 묶음을 공유한다 — 두 입구의 동작이 갈라지지 않게.
+    const inputDeps: ConquestInputDeps = {
       input: this.input,
       keyboard: this.keyboard,
       selection: this.selection,
@@ -94,7 +97,9 @@ export class ConquestGame {
       isAttackMove: () => this.attackMove,
       setAttackMove: (v) => (this.attackMove = v),
       toggleMute: () => this.audio.toggleMute(), // M키 음소거(디펜스와 동일, 공유 엔진).
-    });
+    };
+    bindConquestInput(inputDeps);
+    this.commandBar = new ConquestCommandBar(inputDeps);
     this.setUiVisible(false);
   }
 
@@ -213,6 +218,7 @@ export class ConquestGame {
   }
 
   private syncUi(): void {
+    this.commandBar.update(); // 공격이동 활성 표시 + 부대 인원 배지(D9.4). 내부에서 서명 캐시.
     if (this.world.crystal !== this.lastCrystal) {
       this.lastCrystal = this.world.crystal;
       this.menu.updateAffordability(this.world.crystal);

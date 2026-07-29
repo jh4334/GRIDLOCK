@@ -11,29 +11,23 @@
 
 import type { MouseInput, Keyboard } from '../core/input';
 import type { ConquestWorld } from './conquestWorld';
-import type { ConquestSelection } from './conquestSelection';
-import type { ConquestControlGroups } from './controlGroups';
 import type { BuildKind } from './building';
+import { enterAttackMove, assignGroup, recallGroup, type ConquestActionDeps } from './conquestActions';
 
-export interface ConquestInputDeps {
+// 공격 이동·부대 지정 동작은 D9.4 컨트롤 바 버튼과 공유한다(conquestActions).
+export interface ConquestInputDeps extends ConquestActionDeps {
   input: MouseInput;
   keyboard: Keyboard;
-  selection: ConquestSelection;
-  groups: ConquestControlGroups;
   getWorld: () => ConquestWorld; // 재시작 시 월드가 교체되므로 getter로 최신 참조를 얻는다.
   isActive: () => boolean; // 정복 모드 활성 여부(디펜스·타이틀에서 정복 키 격리).
-  canInteract: () => boolean; // active + playing.
   getPlaceKind: () => BuildKind | null;
-  cancelPlace: () => void; // 건설 모드 해제(placeKind + 메뉴 하이라이트).
   tryPlace: (x: number, y: number, touch: boolean) => void; // touch=true면 2탭 확정(D8.5).
-  isAttackMove: () => boolean;
-  setAttackMove: (v: boolean) => void;
   toggleMute: () => void; // M키 음소거 토글(active 시에만).
 }
 
 /** ConquestGame 생성자에서 1회 호출 — 모든 마우스·키보드 핸들러를 등록한다. */
 export function bindConquestInput(d: ConquestInputDeps): void {
-  const { input, keyboard, selection, groups } = d;
+  const { input, keyboard, selection } = d;
 
   // 선택 중인 아군에게 그 지점 명령(우클릭 = 터치 탭 공통 경로).
   const commandAt = (x: number, y: number): void => {
@@ -94,11 +88,7 @@ export function bindConquestInput(d: ConquestInputDeps): void {
   });
 
   // A — 유닛 선택 상태에서 공격 이동 모드 진입(건설 모드는 해제).
-  keyboard.on('a', () => {
-    if (!d.canInteract() || !selection.hasUnits) return;
-    d.cancelPlace();
-    d.setAttackMove(true);
-  });
+  keyboard.on('a', () => enterAttackMove(d));
 
   keyboard.on('escape', () => {
     if (!d.isActive()) return;
@@ -115,17 +105,8 @@ export function bindConquestInput(d: ConquestInputDeps): void {
   // 1~9 — Ctrl과 함께면 현재 선택을 부대로 지정, 아니면 해당 부대 선택.
   for (let n = 1; n <= 9; n++) {
     keyboard.on(String(n), (e) => {
-      if (!d.canInteract()) return;
-      if (e.ctrlKey || e.metaKey) {
-        groups.assign(n, selection.selectedUnits, selection.selectedWorkers);
-        return;
-      }
-      const g = groups.members(n);
-      if (g) {
-        d.cancelPlace();
-        d.setAttackMove(false);
-        selection.selectGroup(g.units, g.workers);
-      }
+      if (e.ctrlKey || e.metaKey) assignGroup(d, n);
+      else recallGroup(d, n);
     });
   }
 }
