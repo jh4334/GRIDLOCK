@@ -15,6 +15,7 @@ import { mapTerrain, mapSpawns } from './game/maps';
 import { generateMap, todaySeed, randomSeed } from './game/mapGen';
 import { renderTitle, hitTitleButton, hitDifficultyButton, hitDefenseCard, hitConquestCard } from './ui/title';
 import { tickClock } from './render/sprites';
+import { applyViewportTransform, VIEW_W, VIEW_H } from './render/viewport';
 import { exposeSeedPlay } from './debug/balanceProbe';
 
 type Mode = 'title' | 'defense' | 'conquest';
@@ -49,25 +50,26 @@ export class App {
     this.titleInput.onClick((x, y) => {
       if (this.mode !== 'title') return;
       // 하위 선택 버튼(난이도·맵)이 모드 버튼 아래에 있으므로 먼저 판정한다(선택만 바꾸고 진입 안 함).
-      const diff = hitDifficultyButton(canvas.width, canvas.height, x, y);
+      // 히트 판정은 논리 좌표(VIEW_W×VIEW_H) 기준 — 입력 좌표도 논리 좌표로 들어온다(D9.2).
+      const diff = hitDifficultyButton(VIEW_W, VIEW_H, x, y);
       if (diff) {
         this.difficulty = diff;
         saveDifficulty(diff);
         return;
       }
-      const map = hitDefenseCard(canvas.width, canvas.height, x, y);
+      const map = hitDefenseCard(VIEW_W, VIEW_H, x, y);
       if (map) {
         this.mapId = map;
         saveMapId(map);
         return;
       }
-      const cmap = hitConquestCard(canvas.width, canvas.height, x, y);
+      const cmap = hitConquestCard(VIEW_W, VIEW_H, x, y);
       if (cmap) {
         this.conquestMap = cmap;
         saveConquestMap(cmap);
         return;
       }
-      const hit = hitTitleButton(canvas.width, canvas.height, x, y);
+      const hit = hitTitleButton(VIEW_W, VIEW_H, x, y);
       if (hit === 'defense') this.enterDefense();
       else if (hit === 'conquest') this.enterConquest();
     });
@@ -117,6 +119,9 @@ export class App {
   }
 
   private render(): void {
+    // 렌더 루트에서 프레임마다 1회 — 논리 좌표계(960×672)로 변환을 리셋한다(D9.2).
+    // 이 아래의 모든 렌더 코드는 배율을 모른 채 논리 좌표만 쓴다.
+    applyViewportTransform(this.ctx);
     if (this.mode === 'defense') this.game.render();
     else if (this.mode === 'conquest') this.conquest.render();
     else renderTitle(this.ctx, this.game.best, this.difficulty, this.mapId, this.conquestMap, this.game.endlessBest, loadDaily(), todaySeed()); // 타이틀(최고기록 + 난이도 + 디펜스/정복 맵 + 오늘의 맵 기록).

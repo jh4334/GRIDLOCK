@@ -4,6 +4,7 @@
 
 import type { Economy } from '../game/economy';
 import { hudScale } from './uiScale';
+import { VIEW_W } from '../render/viewport';
 
 // 시각 상수(밸런스 아님) — 배율 1 기준 레이아웃.
 const FONT_PX = 16;
@@ -26,7 +27,7 @@ export class Hud {
     ctx.font = `${FONT_PX * s}px monospace`;
     ctx.textBaseline = 'top';
     ctx.textAlign = 'right';
-    const right = ctx.canvas.width - MARGIN * s;
+    const right = VIEW_W - MARGIN * s;
     const top = MARGIN * s;
 
     ctx.fillStyle = '#ffd166';

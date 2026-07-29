@@ -6,6 +6,7 @@ import type { GameState } from '../game/state';
 import type { BestRecord } from '../core/storage';
 import { formatBest } from './title';
 import { hudScale } from './uiScale';
+import { VIEW_W, VIEW_H } from '../render/viewport';
 
 // 시각 상수(밸런스 아님) — 배율 1(데스크톱) 기준 크기·오프셋. 모바일 축소 시 hudScale로 함께 키운다(D8.4).
 const TITLE_PX = 56;
@@ -31,8 +32,8 @@ export function renderOverlay(
 ): void {
   if (state !== 'won' && state !== 'lost') return;
 
-  const w = ctx.canvas.width;
-  const h = ctx.canvas.height;
+  const w = VIEW_W;
+  const h = VIEW_H;
   const s = hudScale(ctx.canvas); // 캔버스 CSS 축소 보정(읽기 전용).
 
   ctx.save();

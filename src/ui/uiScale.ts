@@ -6,6 +6,8 @@
 // 상태를 만지지 않는 읽기 전용 헬퍼라 render에서 호출해도 update/render 분리 규칙을 지킨다.
 // 배율은 시각 상수(밸런스 아님)이므로 코드 상수로 둔다.
 
+import { VIEW_W } from '../render/viewport';
+
 const MIN_SCALE = 1; // 축소가 없는 데스크톱(비율 1) 이하에서는 기존 렌더와 완전히 동일.
 const MAX_SCALE = 2; // 과확대로 HUD가 전장을 덮지 않게 두는 상한.
 
@@ -16,5 +18,7 @@ const MAX_SCALE = 2; // 과확대로 HUD가 전장을 덮지 않게 두는 상�
 export function hudScale(canvas: HTMLCanvasElement): number {
   const cssW = canvas.clientWidth;
   if (!(cssW > 0)) return MIN_SCALE; // 레이아웃 전(0)·비DOM 캔버스에서는 보정하지 않는다.
-  return Math.min(MAX_SCALE, Math.max(MIN_SCALE, canvas.width / cssW));
+  // D9.2: 기준은 논리 폭(VIEW_W)이다. 백스토어(canvas.width)는 DPR 배로 커지므로 그걸 쓰면
+  // CSS 축소가 전혀 없는 레티나 데스크톱에서도 배율 2가 나와 HUD가 두 배로 커진다.
+  return Math.min(MAX_SCALE, Math.max(MIN_SCALE, VIEW_W / cssW));
 }

@@ -3,6 +3,7 @@
 // 이펙트 → 히트박스 → HUD → 오버레이 → FPS)와 화면흔들림 오프셋을 그대로 옮겼다.
 // 읽기 전용(상태 변경 없음) — Game.render가 자신의 참조들을 넘겨 호출한다.
 
+import { VIEW_W, VIEW_H } from '../render/viewport';
 import { renderFlowField } from '../debug/flowField';
 import { renderRoad, type RoadPiece } from '../render/roadPath';
 import { renderHitboxes } from '../debug/cheats';
@@ -47,7 +48,7 @@ export interface DefenseRenderParts {
 }
 
 export function renderDefense(ctx: CanvasRenderingContext2D, p: DefenseRenderParts): void {
-  ctx.clearRect(0, 0, p.canvas.width, p.canvas.height);
+  ctx.clearRect(0, 0, VIEW_W, VIEW_H); // 논리 좌표로 지운다 — 변환(D9.2 배율)이 걸린 상태라 백스토어 크기를 쓰면 안 된다.
 
   // 화면흔들림 — 캔버스 전체를 오프셋(계산은 update, 여기선 적용만). translate는 clear 이후.
   ctx.save();
@@ -80,5 +81,5 @@ export function renderDefense(ctx: CanvasRenderingContext2D, p: DefenseRenderPar
   ctx.restore();
 
   // 기지 피격 비네트는 화면흔들림 오프셋 밖(restore 이후)에서 화면 절대 좌표로 덮는다(D2.5).
-  p.vignette.render(ctx, p.canvas.width, p.canvas.height);
+  p.vignette.render(ctx, VIEW_W, VIEW_H);
 }

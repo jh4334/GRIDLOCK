@@ -6,6 +6,7 @@ import type { BestRecord, DailyRecord, DifficultyId, MapId, ConquestMapId } from
 import { animTime } from '../render/sprites';
 import { titleButtons, drawButton, drawDifficultyButtons } from './titleButtons';
 import { drawDefenseCards, drawConquestCards } from './mapCards';
+import { VIEW_W, VIEW_H } from '../render/viewport';
 
 // hit*·TitleMode는 App이 클릭 판정에 쓰므로 하위 모듈에서 재노출(호출부 import 경로 단일화).
 export { hitTitleButton, hitDifficultyButton, type TitleMode } from './titleButtons';
@@ -33,8 +34,8 @@ export function renderTitle(
   daily: DailyRecord | null = null, // 오늘의 맵 최고기록(D7.5) — 시드가 오늘이면 맵 버튼 옆에 표시.
   todaySeedVal = 0, // 오늘의 맵 시드(YYYYMMDD) — daily.seed와 일치할 때만 기록 표시.
 ): void {
-  const w = ctx.canvas.width;
-  const h = ctx.canvas.height;
+  const w = VIEW_W;
+  const h = VIEW_H;
 
   ctx.save();
   paintBackdrop(ctx, w, h);

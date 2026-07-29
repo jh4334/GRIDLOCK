@@ -19,6 +19,7 @@ import { renderConquestHud, renderConquestOverlay, renderAttackMoveCursor } from
 import { renderMinimap, type MinimapData } from './minimap';
 import { bindConquestInput } from './conquestInput';
 import { publishConquestTelemetry } from '../debug/conquestTelemetry';
+import { VIEW_W, VIEW_H } from '../render/viewport';
 import type { BuildKind } from './building';
 import type { ConquestPhase } from './conquestWorld';
 
@@ -32,7 +33,6 @@ export interface ConquestDeps {
 
 export class ConquestGame {
   private readonly ctx: CanvasRenderingContext2D;
-  private readonly canvas: HTMLCanvasElement;
   private readonly input: MouseInput;
   private readonly keyboard = new Keyboard();
   private readonly audio: AudioEngine; // App이 주입(공유 엔진). 생성자에서 deps로부터 대입.
@@ -56,7 +56,6 @@ export class ConquestGame {
   private lastPhase: ConquestPhase = 'playing';
 
   constructor(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D, deps: ConquestDeps) {
-    this.canvas = canvas;
     this.ctx = ctx;
     this.audio = deps.audio;
     this.input = new MouseInput(canvas);
@@ -238,7 +237,7 @@ export class ConquestGame {
   // ── render(읽기 전용) ────────────────────────────────────────
   render(): void {
     const ctx = this.ctx;
-    ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    ctx.clearRect(0, 0, VIEW_W, VIEW_H); // 논리 좌표로 지운다(백스토어는 DPR 배, D9.2).
     const w = this.world;
 
     w.grid.render(ctx);

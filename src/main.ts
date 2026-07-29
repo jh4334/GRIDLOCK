@@ -5,10 +5,15 @@ import './styles/main.css'; // UI 스타일(D9.1) — Vite가 번들·주입한�
 import { App } from './app';
 import { loadKenneyAssets } from './render/assetLoader';
 import { exposeMapGen } from './debug/mapGenTelemetry';
+import { setupViewport } from './render/viewport';
 
 const canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
 const ctx = canvas.getContext('2d');
 if (!ctx) throw new Error('Canvas 2D context를 얻을 수 없습니다.');
+
+// D9.2 — 백스토어를 DPR 배로 확장(논리 좌표계는 960×672 불변). 컨텍스트 확보 직후,
+// 첫 프레임 전에 해야 한다(width 대입은 컨텍스트 상태를 초기화한다).
+setupViewport(canvas);
 
 // App을 먼저 만들어 즉시 실행(벡터 폴백) — 그 뒤 실제 Kenney 스킨을 비동기 로드해 교체한다.
 // Grid/ConquestGrid가 생성자에서 onAssetsReady를 등록하므로, 로드 완료 시 바닥이 타일로 재빌드된다.

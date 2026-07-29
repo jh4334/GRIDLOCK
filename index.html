@@ -7,6 +7,9 @@
   </head>
   <body>
     <div id="app">
+      <!-- width/height는 부팅 전(모듈 스크립트 실행 전) 비율을 잡아주는 초기값일 뿐이다.
+           실제 백스토어는 JS가 DPR 배로 다시 설정하고(D9.2, src/render/viewport.ts),
+           화면 표시 폭은 CSS(#game-canvas)가 논리 폭 960px로 고정한다. -->
       <canvas id="game-canvas" width="960" height="672"></canvas>
       <div id="controls"></div>
       <div id="conquest-controls"></div>

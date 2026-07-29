@@ -1,12 +1,15 @@
-// 포인터 입력 추적 — 캔버스 기준 픽셀 좌표로 보정해 노출한다.
+// 포인터 입력 추적 — 캔버스 논리 좌표(960×672)로 보정해 노출한다.
 //
-// 캔버스가 CSS로 확대/축소되어도(rect.width ≠ canvas.width) 실제 내부 픽셀
-// 좌표로 환산해야 그리드 칸 계산이 어긋나지 않는다.
+// 캔버스가 CSS로 확대/축소되어도(rect.width ≠ 논리 폭) 논리 좌표로 환산해야
+// 그리드 칸 계산이 어긋나지 않는다. 백스토어는 DPR 배로 커질 수 있으므로(D9.2)
+// 환산 기준은 canvas.width가 아니라 VIEW_W/VIEW_H다.
 //
 // D8.2: mouse* → Pointer Events 마이그레이션. 터치·펜이 브라우저의 마우스 에뮬레이션을
 // 거치지 않고 1급 입력으로 들어온다(에뮬레이션 지연·유실 없음). 마우스 동작은 그대로다 —
 // pointerdown/up의 button===0 검사가 기존 좌클릭 판정과 동일하고, 우클릭은 contextmenu로
 // 계속 받는다. 멀티터치는 첫 포인터만 추적하고(pointerId 고정) 나머지는 무시한다.
+
+import { VIEW_W, VIEW_H } from '../render/viewport';
 
 // 마지막 입력 장치 종류. D8.3(터치 배치 UX)이 분기 근거로 쓸 예정 — 여기서는 노출만 한다.
 export type PointerKind = 'mouse' | 'touch' | 'pen';
@@ -76,11 +79,13 @@ export class MouseInput {
   // 드래그 콜백(다중 선택용).
   private drag: DragHandlers | null = null;
 
-  // 캔버스 내부 픽셀 좌표로 보정(CSS 확대/축소 반영).
+  // 캔버스 논리 좌표로 보정(CSS 확대/축소 반영).
   private toCanvas(e: MouseEvent): { x: number; y: number } {
     const rect = this.canvas.getBoundingClientRect();
-    const scaleX = this.canvas.width / rect.width;
-    const scaleY = this.canvas.height / rect.height;
+    // D9.2: 기준은 백스토어(canvas.width, DPR 배)가 아니라 논리 크기다 — 백스토어로 나누면
+    // DPR 2에서 좌표가 2배로 튀어 칸 계산이 어긋난다.
+    const scaleX = VIEW_W / rect.width;
+    const scaleY = VIEW_H / rect.height;
     return { x: (e.clientX - rect.left) * scaleX, y: (e.clientY - rect.top) * scaleY };
   }
 
