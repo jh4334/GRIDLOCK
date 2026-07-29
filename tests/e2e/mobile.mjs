@@ -11,6 +11,8 @@
 //   2) 터치 타깃 — 보이는 button 전부 44px 이상 + 서로 겹치지 않음 (D8.4)
 //   3) 디펜스 — 터치 진입 → 2탭 배치(첫 탭 골드 불변 → 재탭 차감) → 웨이브 1 시작·완주 (D8.2/D8.3)
 //   4) 정복 — 터치 진입 → 일꾼 생산 → 탭 이동 명령(좌표 변화) → 건설 2탭 확정 (D8.5)
+//   5) 타이틀(캔버스 내부) — compact 레이아웃의 탭·카드·페이지·난이도 히트 영역이
+//      화면상 44px 이상 (D9.3). DOM이 아니라 논리 좌표 × 캔버스 축소비로 잰다.
 //
 // 실패 시 어느 단계에서 깨졌는지 stderr 한 줄 + 비-0 종료(runner가 감지).
 
@@ -18,7 +20,17 @@ import { chromium } from 'playwright-core';
 import { mkdir, readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { CONQUEST_BTN, DEFENSE_BTN, DIFF_EASY, GAME_W, TILE } from './titleCoords.mjs';
+import {
+  GAME_W,
+  TILE,
+  MOBILE_CONQUEST_TAB,
+  MOBILE_DEFENSE_TAB,
+  mobileCardRect,
+  mobileDiffCenter,
+  mobileDiffRect,
+  mobilePageRect,
+  mobileTabRect,
+} from './titleCoords.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const OUT = join(HERE, 'out');
@@ -125,6 +137,25 @@ async function assertScreen(page, label, { minButtons = 1 } = {}) {
   return a;
 }
 
+// 타이틀은 캔버스에 그려서 DOM button이 없다 — 논리 rect를 캔버스 축소비로 환산해 터치 타깃을 잰다(D9.3).
+function assertTitleTargets(scale) {
+  stage = 'title-targets';
+  const targets = [
+    ['디펜스 탭', mobileTabRect('defense')],
+    ['정복 탭', mobileTabRect('conquest')],
+    ...[0, 1, 2, 3].map((i) => [`맵 카드 ${i}`, mobileCardRect(i)]),
+    ['이전 페이지', mobilePageRect('prev')],
+    ['다음 페이지', mobilePageRect('next')],
+    ...[0, 1, 2].map((i) => [`난이도 ${i}`, mobileDiffRect(i)]),
+  ];
+  const small = targets
+    .map(([name, r]) => [name, +(r.w * scale).toFixed(1), +(r.h * scale).toFixed(1)])
+    .filter(([, w, h]) => w < MIN_TARGET || h < MIN_TARGET)
+    .map(([name, w, h]) => `${name} ${w}×${h}`);
+  check(small.length === 0, `타이틀: ${MIN_TARGET}px 미달 터치 타깃 ${small.length}건 — ${small.join(', ')}`);
+  log(`타이틀 터치 타깃 ${targets.length}개 전부 ${MIN_TARGET}px 이상(캔버스 축소비 ${scale.toFixed(3)})`);
+}
+
 // ── 1) 디펜스: 터치 진입 → 2탭 배치 → 웨이브 1 ────────────────────
 async function defenseStage(page) {
   stage = 'defense-enter';
@@ -134,7 +165,8 @@ async function defenseStage(page) {
   await shot(page, '01-title');
 
   const t0 = await canvasMapper(page);
-  await tap(page, t0.pt(...DEFENSE_BTN), 700);
+  assertTitleTargets(t0.s);
+  await tap(page, t0.pt(...MOBILE_DEFENSE_TAB), 700); // 디펜스는 기본 활성 섹션이라 탭 1회로 진입.
   check(await vis(page, '.tower-btn').isVisible(), '디펜스 진입 실패(빌드 메뉴가 안 보임)');
   const { cell } = await canvasMapper(page); // 인게임 UI 노출로 캔버스 위치가 바뀌므로 재계산.
   await assertScreen(page, 'defense', { minButtons: 6 });
@@ -210,8 +242,11 @@ async function conquestStage(page) {
   await page.goto(BASE_URL);
   await page.waitForTimeout(1200);
   const t0 = await canvasMapper(page);
-  await tap(page, t0.pt(...DIFF_EASY), 150); // 쉬움 = 적 첫 공격이 늦어 검증 구간 간섭 최소.
-  await tap(page, t0.pt(...CONQUEST_BTN), 800);
+  // compact 타이틀은 섹션 탭이다 — 비활성(정복) 탭 1탭 = 섹션 전환(진입 아님), 난이도 선택 후 재탭 = 진입.
+  await tap(page, t0.pt(...MOBILE_CONQUEST_TAB), 250);
+  check((await conq(page)) === null, '정복 탭 첫 탭에서 바로 진입됨 — 섹션 전환 규칙 위반');
+  await tap(page, t0.pt(...mobileDiffCenter(0)), 150); // 쉬움 = 적 첫 공격이 늦어 검증 구간 간섭 최소.
+  await tap(page, t0.pt(...MOBILE_CONQUEST_TAB), 800);
   const { pt, cell } = await canvasMapper(page);
   check((await conq(page)) !== null, '정복 진입 실패(텔레메트리 없음)');
   await assertScreen(page, 'conquest', { minButtons: 6 });
