@@ -13,14 +13,19 @@ import { Game } from './game/game';
 import { ConquestGame } from './conquest/conquestGame';
 import { mapTerrain, mapSpawns } from './game/maps';
 import { generateMap, todaySeed, randomSeed } from './game/mapGen';
-import { renderTitle, hitTitleButton, hitDifficultyButton, hitDefenseCard, hitConquestCard } from './ui/title';
+import { renderTitle, hitTitle, defenseCardPage, type TitleMode, type TitleUi } from './ui/title';
+import { hudScale } from './ui/uiScale';
 import { tickClock } from './render/sprites';
+import { applyViewportTransform } from './render/viewport';
 import { exposeSeedPlay } from './debug/balanceProbe';
+import { exposeHudMetrics } from './debug/hudTelemetry';
+import { measureSeedText } from './ui/hud';
 
 type Mode = 'title' | 'defense' | 'conquest';
 
 export class App {
   private readonly ctx: CanvasRenderingContext2D;
+  private readonly canvas: HTMLCanvasElement; // 타이틀 레이아웃 분기 기준(hudScale)을 매번 다시 읽는다.
   private readonly titleInput: MouseInput;
   private readonly audio: AudioEngine;
   private readonly game: Game;
@@ -29,9 +34,14 @@ export class App {
   private difficulty: DifficultyId = loadDifficulty(); // 정복 난이도(타이틀에서 선택, 하이라이트·저장).
   private mapId: MapId = loadMapId(); // 디펜스 맵(평원/협곡) — 타이틀에서 선택, 진입 시 적용(D4.4).
   private conquestMap: ConquestMapId = loadConquestMap(); // 정복 맵(표준/능선/사분면) — 타이틀에서 선택, 진입 시 적용(D7.4).
+  // 좁은 화면 타이틀(D9.3) 상태 — 보이는 섹션과 맵 카드 페이지. 데스크톱 레이아웃에서는 쓰이지 않는다.
+  private titleSection: TitleMode = 'defense';
+  private titlePage = 0;
 
   constructor(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D) {
     this.ctx = ctx;
+    this.canvas = canvas;
+    this.titlePage = defenseCardPage(this.mapId); // 저장된 선택 맵이 보이는 페이지에서 시작.
 
     // 두 모드가 하나의 사운드 엔진을 공유한다 — 음량·음소거가 모드 간 어긋나지 않게.
     // 저장값을 복원해 초기화하고, 이후 변경(슬라이더·버튼·M키)은 localStorage에 즉시 저장한다.
@@ -45,31 +55,38 @@ export class App {
     // 다시 처리되지 않도록(모드 입력은 아직 비활성일 때 먼저 지나가고, 그다음 여기서 활성화).
     this.titleInput = new MouseInput(canvas);
 
-    // 타이틀 화면 버튼 클릭 → 모드 진입(타이틀 상태에서만).
+    // 타이틀 화면 클릭/탭 → 선택 변경 또는 모드 진입(타이틀 상태에서만).
+    // 판정은 렌더와 같은 레이아웃(titleLayout)에서 나오므로 좁은 화면에서도 그린 자리와 어긋나지 않는다.
+    // 좌표는 논리 좌표(960×672)로 들어온다(D9.2).
     this.titleInput.onClick((x, y) => {
       if (this.mode !== 'title') return;
-      // 하위 선택 버튼(난이도·맵)이 모드 버튼 아래에 있으므로 먼저 판정한다(선택만 바꾸고 진입 안 함).
-      const diff = hitDifficultyButton(canvas.width, canvas.height, x, y);
-      if (diff) {
-        this.difficulty = diff;
-        saveDifficulty(diff);
-        return;
+      const act = hitTitle(this.titleUi(), x, y);
+      if (!act) return;
+      switch (act.kind) {
+        case 'difficulty':
+          this.difficulty = act.id;
+          saveDifficulty(act.id);
+          break;
+        case 'defenseMap':
+          this.mapId = act.id;
+          saveMapId(act.id);
+          break;
+        case 'conquestMap':
+          this.conquestMap = act.id;
+          saveConquestMap(act.id);
+          break;
+        case 'page':
+          this.titlePage = act.page;
+          break;
+        case 'section': // 좁은 화면 전용 — 비활성 탭 탭은 섹션 전환만(오탭 진입 방지).
+          this.titleSection = act.mode;
+          this.titlePage = act.mode === 'defense' ? defenseCardPage(this.mapId) : 0;
+          break;
+        case 'enter':
+          if (act.mode === 'defense') this.enterDefense();
+          else this.enterConquest();
+          break;
       }
-      const map = hitDefenseCard(canvas.width, canvas.height, x, y);
-      if (map) {
-        this.mapId = map;
-        saveMapId(map);
-        return;
-      }
-      const cmap = hitConquestCard(canvas.width, canvas.height, x, y);
-      if (cmap) {
-        this.conquestMap = cmap;
-        saveConquestMap(cmap);
-        return;
-      }
-      const hit = hitTitleButton(canvas.width, canvas.height, x, y);
-      if (hit === 'defense') this.enterDefense();
-      else if (hit === 'conquest') this.enterConquest();
     });
 
     // D7.7 밸런스 측정 — 고정 시드 랜덤맵 디펜스 강제 진입(측정 봇 전용). 타이틀엔 시드 강제 경로가
@@ -79,6 +96,14 @@ export class App {
       const g = generateMap(seed);
       this.game.activate(g.terrain, g.spawns, { seed, mode: 'random' });
     });
+
+    // D9.5 시드 부제 가독성 검증 훅 — 캔버스에 그린 텍스트라 DOM으로 못 재는 값을 노출한다.
+    exposeHudMetrics((text) => measureSeedText(this.ctx, text));
+  }
+
+  // 타이틀 UI 상태 — 렌더와 히트 판정이 같은 값을 받아야 그린 자리와 누른 자리가 일치한다.
+  private titleUi(): TitleUi {
+    return { scale: hudScale(this.canvas), section: this.titleSection, page: this.titlePage };
   }
 
   start(): void {
@@ -117,8 +142,11 @@ export class App {
   }
 
   private render(): void {
+    // 렌더 루트에서 프레임마다 1회 — 논리 좌표계(960×672)로 변환을 리셋한다(D9.2).
+    // 이 아래의 모든 렌더 코드는 배율을 모른 채 논리 좌표만 쓴다.
+    applyViewportTransform(this.ctx);
     if (this.mode === 'defense') this.game.render();
     else if (this.mode === 'conquest') this.conquest.render();
-    else renderTitle(this.ctx, this.game.best, this.difficulty, this.mapId, this.conquestMap, this.game.endlessBest, loadDaily(), todaySeed()); // 타이틀(최고기록 + 난이도 + 디펜스/정복 맵 + 오늘의 맵 기록).
+    else renderTitle(this.ctx, this.game.best, this.difficulty, this.mapId, this.conquestMap, this.game.endlessBest, loadDaily(), todaySeed(), this.titleUi()); // 타이틀(최고기록 + 난이도 + 디펜스/정복 맵 + 오늘의 맵 기록).
   }
 }

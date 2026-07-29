@@ -5,6 +5,7 @@
 import type { ConquestPhase } from './conquestWorld';
 import type { DifficultyId } from '../core/storage';
 import { hudScale } from '../ui/uiScale';
+import { VIEW_W, VIEW_H } from '../render/viewport';
 
 export interface ConquestHudInfo {
   crystal: number;
@@ -44,7 +45,7 @@ export function renderConquestHud(ctx: CanvasRenderingContext2D, info: ConquestH
   ctx.textAlign = 'right';
   const margin = HUD_MARGIN * s;
   const line = HUD_LINE * s;
-  const right = ctx.canvas.width - margin;
+  const right = VIEW_W - margin;
 
   ctx.fillStyle = '#5be0d0';
   ctx.fillText(`크리스탈 ${info.crystal}`, right, margin);
@@ -90,8 +91,8 @@ export function renderAttackMoveCursor(ctx: CanvasRenderingContext2D, x: number,
 /** 승패 확정 시 결과 오버레이(읽기 전용). playing이면 아무 것도 그리지 않는다. */
 export function renderConquestOverlay(ctx: CanvasRenderingContext2D, phase: ConquestPhase): void {
   if (phase === 'playing') return;
-  const w = ctx.canvas.width;
-  const h = ctx.canvas.height;
+  const w = VIEW_W;
+  const h = VIEW_H;
   const s = hudScale(ctx.canvas); // 캔버스 CSS 축소 보정(읽기 전용).
 
   ctx.save();

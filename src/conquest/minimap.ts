@@ -3,6 +3,7 @@
 // 매 프레임 월드에서 좌표를 모아 넘겨주고, 여기서는 색 점으로만 그린다. 클릭 내비게이션 없음.
 
 import { COLS, ROWS, TILE } from '../game/grid';
+import { VIEW_W, VIEW_H } from '../render/viewport';
 
 // 미니맵에 찍을 좌표 묶음(칸 기반: 크리스탈·구조물 / 픽셀 기반: 이동 유닛).
 export interface MinimapData {
@@ -32,8 +33,8 @@ const COLOR_PLAYER_MOB = '#7fd0ff';
 const COLOR_ENEMY_MOB = '#ff6b6b';
 
 export function renderMinimap(ctx: CanvasRenderingContext2D, data: MinimapData): void {
-  const ox = ctx.canvas.width - MM_W - MARGIN;
-  const oy = ctx.canvas.height - MM_H - MARGIN;
+  const ox = VIEW_W - MM_W - MARGIN;
+  const oy = VIEW_H - MM_H - MARGIN;
 
   ctx.save();
   ctx.fillStyle = COLOR_BG;

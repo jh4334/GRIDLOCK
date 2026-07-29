@@ -3,6 +3,7 @@
 // 문구는 밸런스가 아닌 UI 카피이므로 코드 상수로 둔다(CLAUDE.md 예외).
 
 import { hudScale } from './uiScale';
+import { VIEW_W, VIEW_H } from '../render/viewport';
 
 // 설치 실패 사유 문구(코드 상수).
 export const MSG_GOLD = '골드가 부족합니다';
@@ -39,8 +40,8 @@ export class Toast {
     if (this.timer <= 0) return;
     const alpha = Math.min(1, this.timer / FADE_TIME); // 마지막 FADE_TIME초 동안만 페이드.
     const s = hudScale(ctx.canvas); // 캔버스 CSS 축소 보정(읽기 전용).
-    const x = ctx.canvas.width / 2;
-    const y = ctx.canvas.height - MARGIN_BOTTOM * s;
+    const x = VIEW_W / 2;
+    const y = VIEW_H - MARGIN_BOTTOM * s;
     ctx.save();
     ctx.globalAlpha = alpha;
     ctx.font = `bold ${FONT_PX * s}px system-ui, sans-serif`;
